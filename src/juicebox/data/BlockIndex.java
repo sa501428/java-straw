@@ -25,7 +25,6 @@
 package juicebox.data;
 
 import htsjdk.tribble.util.LittleEndianInputStream;
-import juicebox.tools.utils.original.IndexEntry;
 
 import java.io.IOException;
 import java.util.ArrayList;

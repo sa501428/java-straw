@@ -24,28 +24,19 @@
 
 package juicebox.data;
 
-import juicebox.data.basics.ListOfDoubleArrays;
-import juicebox.windowui.HiCZoom;
-import juicebox.windowui.NormalizationType;
+public class LargeIndexEntry {
+    public final long position;
+    public final long size;
+    int id;
 
-/**
- * @author jrobinso
- *         Date: 12/26/12
- *         Time: 9:30 PM
- */
-public interface ExpectedValueFunction {
+    LargeIndexEntry(int id, long position, long size) {
+        this.id = id;
+        this.position = position;
+        this.size = size;
+    }
 
-    double getExpectedValue(int chrIdx, long distance);
-
-    long getLength();
-
-    NormalizationType getNormalizationType();
-
-    HiCZoom.HiCUnit getUnit();
-
-    int getBinSize();
-
-    ListOfDoubleArrays getExpectedValuesNoNormalization();
-
-    ListOfDoubleArrays getExpectedValuesWithNormalization(int chrIdx);
+    public LargeIndexEntry(long position, long size) {
+        this.position = position;
+        this.size = size;
+    }
 }

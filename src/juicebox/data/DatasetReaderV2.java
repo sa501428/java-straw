@@ -27,12 +27,9 @@ package juicebox.data;
 
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.tribble.util.LittleEndianInputStream;
-import juicebox.HiC;
 import juicebox.HiCGlobals;
 import juicebox.data.basics.Chromosome;
 import juicebox.data.basics.ListOfDoubleArrays;
-import juicebox.tools.utils.original.IndexEntry;
-import juicebox.tools.utils.original.LargeIndexEntry;
 import juicebox.windowui.HiCZoom;
 import juicebox.windowui.NormalizationHandler;
 import juicebox.windowui.NormalizationType;
@@ -43,9 +40,6 @@ import org.broad.igv.util.Pair;
 import org.broad.igv.util.ParsingUtils;
 import org.broad.igv.util.stream.IGVSeekableStreamFactory;
 
-import javax.swing.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.io.*;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -93,10 +87,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             version = dis.readInt();
             position += 4;
     
-            if (HiCGlobals.guiIsCurrentlyActive) {
-                System.out.println("HiC file version: " + version);
-            }
-            //System.out.println("HiC file version: " + version);
+            System.out.println("HiC file version: " + version);
             masterIndexPos = dis.readLong();
     
             position += 8;
@@ -131,10 +122,6 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
             dataset.setAttributes(attributes);
 
-            if (dataset.getHiCFileScalingFactor() != null) {
-                HiCGlobals.hicMapScale = Double.parseDouble(dataset.getHiCFileScalingFactor());
-            }
-
             // Read chromosome dictionary
             int nchrs = dis.readInt();
             position += 4;
@@ -156,7 +143,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                 chromosomes.add(new Chromosome(i, name, size));
             }
             boolean createWholeChr = false;
-            ChromosomeHandler chromosomeHandler = new ChromosomeHandler(chromosomes, genomeId, createWholeChr, true);
+            ChromosomeHandler chromosomeHandler = new ChromosomeHandler(chromosomes, genomeId, createWholeChr);
 
             dataset.setChromosomeHandler(chromosomeHandler);
             // guess genomeID from chromosomes
@@ -208,9 +195,6 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
                     stream.skip(nSites * 4);
                     position += nSites * 4;
-                }
-                if (firstChrName != null) {
-                    dataset.setRestrictionEnzyme(map.get(firstChrName));
                 }
                 dataset.setFragmentCounts(map);
             }
@@ -269,24 +253,6 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     @Override
-    public List<JCheckBox> getCheckBoxes(List<ActionListener> actionListeners) {
-        String truncatedName = HiCFileTools.getTruncatedText(getPath(), maxLengthEntryName);
-        final JCheckBox checkBox = new JCheckBox(truncatedName);
-        checkBox.setSelected(isActive());
-        checkBox.setToolTipText(getPath());
-        actionListeners.add(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                setActive(checkBox.isSelected());
-            }
-        });
-
-        List<JCheckBox> checkBoxList = new ArrayList<>();
-        checkBoxList.add(checkBox);
-        return checkBoxList;
-    }
-
-    @Override
     public NormalizationVector getNormalizationVector(int chr1Idx, HiCZoom zoom, NormalizationType normalizationType) {
         return dataset.getNormalizationVector(chr1Idx, zoom, normalizationType);
     }
@@ -297,7 +263,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream));
 
         String hicUnitStr = dis.readString();
-        HiC.Unit unit = HiC.valueOfUnit(hicUnitStr);
+        HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(hicUnitStr);
         dis.readInt();                // Old "zoom" index -- not used
 
         // Stats.  Not used yet, but we need to read them anyway
@@ -475,7 +441,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     
             NormalizationType no = NormalizationHandler.NONE;
             String unitString = dis.readString();
-            HiC.Unit unit = HiC.valueOfUnit(unitString);
+            HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(unitString);
             int binSize = dis.readInt();
             String key = unitString + "_" + binSize + "_" + no;
             long nValues;
@@ -537,7 +503,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             for (int i = 0; i < nExpectedValues; i++) {
                 String typeString = dis.readString();
                 String unitString = dis.readString();
-                HiC.Unit unit = HiC.valueOfUnit(unitString);
+                HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(unitString);
                 int binSize = dis.readInt();
                 String key = unitString + "_" + binSize + "_" + typeString;
                 //System.out.println(key);
@@ -716,7 +682,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     @Override
-    public NormalizationVector readNormalizationVector(NormalizationType type, int chrIdx, HiC.Unit unit, int binSize) throws IOException {
+    public NormalizationVector readNormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize) throws IOException {
         String key = NormalizationVector.getKey(type, chrIdx, unit.toString(), binSize);
         if (normVectorIndex == null) return null;
         LargeIndexEntry idx = normVectorIndex.get(key);
@@ -759,7 +725,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     @Override
-    public NormalizationVector readNormalizationVectorPart(NormalizationType type, int chrIdx, HiC.Unit unit, int binSize, int bound1, int bound2) throws IOException {
+    public NormalizationVector readNormalizationVectorPart(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize, int bound1, int bound2) throws IOException {
         String key = NormalizationVector.getKey(type, chrIdx, unit.toString(), binSize);
         if (normVectorIndex == null) return null;
         LargeIndexEntry idx = normVectorIndex.get(key);

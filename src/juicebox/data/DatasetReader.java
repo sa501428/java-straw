@@ -24,13 +24,9 @@
 
 package juicebox.data;
 
-import juicebox.HiC;
-import juicebox.matrix.BasicMatrix;
 import juicebox.windowui.HiCZoom;
 import juicebox.windowui.NormalizationType;
 
-import javax.swing.*;
-import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.util.List;
 
@@ -53,29 +49,15 @@ public interface DatasetReader {
 
     Block readNormalizedBlock(int blockNumber, MatrixZoomData zd, NormalizationType no) throws IOException;
 
-    /**
-     * Return the list of occupied block numbers for the given matrix.
-     *
-     * @param matrixZoomData
-     * @return
-     */
     List<Integer> getBlockNumbers(MatrixZoomData matrixZoomData);
-
-    double[] readEigenvector(String chrName, HiCZoom zoom, int number, String type);
 
     void close();
 
-    NormalizationVector readNormalizationVector(NormalizationType type, int chrIdx, HiC.Unit unit, int binSize) throws IOException;
+    NormalizationVector readNormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize) throws IOException;
 
-    NormalizationVector readNormalizationVectorPart(NormalizationType type, int chrIdx, HiC.Unit unit, int binSize, int bound1, int bound2) throws IOException;
-
-    BasicMatrix readPearsons(String chr1Name, String chr2Name, HiCZoom zoom, NormalizationType type) throws IOException;
+    NormalizationVector readNormalizationVectorPart(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize, int bound1, int bound2) throws IOException;
 
     String getPath();
-
-    String readStats() throws IOException;
-
-    List<JCheckBox> getCheckBoxes(List<ActionListener> actionListeners);
 
     NormalizationVector getNormalizationVector(int chr1Idx, HiCZoom zoom, NormalizationType normalizationType);
 

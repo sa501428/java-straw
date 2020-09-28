@@ -27,48 +27,33 @@ package juicebox.data;
 import juicebox.HiCGlobals;
 import juicebox.data.basics.Chromosome;
 import juicebox.data.basics.ListOfDoubleArrays;
-import juicebox.tools.chrom.sizes.ChromosomeSizes;
-import juicebox.tools.utils.common.MatrixTools;
+import juicebox.tools.MatrixTools;
 import juicebox.windowui.HiCZoom;
 import juicebox.windowui.NormalizationType;
 import org.apache.commons.math.linear.RealMatrix;
 
 import java.io.*;
 import java.util.*;
-import java.util.regex.Pattern;
 
 /**
  * Created by muhammadsaadshamim on 5/12/15.
  */
 public class HiCFileTools {
 
-    public static Dataset extractDatasetForCLT(List<String> files, boolean allowPrinting) {
+    public static Dataset extractDatasetForCLT(String file, boolean allowPrinting) {
         Dataset dataset = null;
         try {
             DatasetReader reader = null;
-            if (files.size() == 1) {
-                if (allowPrinting)
-                    System.out.println("Reading file: " + files.get(0));
-                String magicString = DatasetReaderFactory.getMagicString(files.get(0));
-                if (magicString.equals("HIC")) {
-                    reader = new DatasetReaderV2(files.get(0));
-                } else {
-                    System.err.println("This version of HIC is no longer supported");
-                    System.exit(32);
-                }
-                dataset = reader.read();
-
+            if (allowPrinting)
+                System.out.println("Reading file: " + file);
+            String magicString = DatasetReaderFactory.getMagicString(file);
+            if (magicString.equals("HIC")) {
+                reader = new DatasetReaderV2(file);
             } else {
-                if (allowPrinting)
-                    System.out.println("Reading summed files: " + files);
-                reader = DatasetReaderFactory.getReader(files);
-                if (reader == null) {
-                    System.err.println("Error while reading files");
-                    System.exit(33);
-                } else {
-                    dataset = reader.read();
-                }
+                System.err.println("This version of HIC is no longer supported");
+                System.exit(32);
             }
+            dataset = reader.read();
             HiCGlobals.verifySupportedHiCFileVersion(reader.getVersion());
         } catch (Exception e) {
             System.err.println("Could not read hic file: " + e.getMessage());
@@ -81,26 +66,14 @@ public class HiCFileTools {
     public static DatasetReader extractDatasetReaderForCLT(List<String> files, boolean allowPrinting) {
         DatasetReader reader = null;
         try {
-            if (files.size() == 1) {
-                if (allowPrinting)
-                    System.out.println("Reading file: " + files.get(0));
-                String magicString = DatasetReaderFactory.getMagicString(files.get(0));
-                if (magicString.equals("HIC")) {
-                    reader = new DatasetReaderV2(files.get(0));
-                } else {
-                    System.err.println("This version of HIC is no longer supported");
-                    System.exit(32);
-                }
-
-
+            if (allowPrinting)
+                System.out.println("Reading file: " + files.get(0));
+            String magicString = DatasetReaderFactory.getMagicString(files.get(0));
+            if (magicString.equals("HIC")) {
+                reader = new DatasetReaderV2(files.get(0));
             } else {
-                if (allowPrinting)
-                    System.out.println("Reading summed files: " + files);
-                reader = DatasetReaderFactory.getReader(files);
-                if (reader == null) {
-                    System.err.println("Error while reading files");
-                    System.exit(33);
-                }
+                System.err.println("This version of HIC is no longer supported");
+                System.exit(32);
             }
 
         } catch (Exception e) {
@@ -109,74 +82,6 @@ public class HiCFileTools {
             //e.printStackTrace();
         }
         return reader;
-    }
-
-    /**
-     * Load the list of chromosomes based on given genome id or file
-     *
-     * @param idOrFile string
-     * @return list of chromosomes
-     */
-    public static ChromosomeHandler loadChromosomes(String idOrFile) {
-
-        InputStream is = null;
-
-        try {
-            // Note: to get this to work, had to edit Intellij settings
-            // so that "?*.sizes" are considered sources to be copied to class path
-            is = ChromosomeSizes.class.getResourceAsStream(idOrFile + ".chrom.sizes");
-
-            if (is == null) {
-                // Not an ID,  see if its a file
-                File file = new File(idOrFile);
-
-                try {
-                    if (file.exists()) {
-                        is = new FileInputStream(file);
-                    } else {
-                        System.err.println("Could not find chromosome sizes file for: " + idOrFile);
-                        System.exit(35);
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-
-            List<Chromosome> chromosomes = new ArrayList<>();
-            chromosomes.add(0, null);   // Index 0 reserved for "whole genome" pseudo-chromosome
-
-            Pattern pattern = Pattern.compile("\\s+");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is), HiCGlobals.bufferSize);
-            String nextLine;
-            int idx = 1;
-
-            try {
-                while ((nextLine = reader.readLine()) != null) {
-                    String[] tokens = pattern.split(nextLine);
-                    if (tokens.length == 2) {
-                        String name = tokens[0];
-                        int length = Integer.parseInt(tokens[1]);
-                        chromosomes.add(idx, new Chromosome(idx, name, length));
-                        idx++;
-                    } else {
-                        System.out.println("Skipping " + nextLine);
-                    }
-                }
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-
-            // "pseudo-chromosome" All taken care of by by chromosome handler
-            return new ChromosomeHandler(chromosomes, idOrFile, false);
-        } finally {
-            if (is != null) {
-                try {
-                    is.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
     }
 
     /**

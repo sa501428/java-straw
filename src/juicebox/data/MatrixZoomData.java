@@ -26,26 +26,11 @@
 package juicebox.data;
 
 import htsjdk.tribble.util.LittleEndianOutputStream;
-import juicebox.HiC;
 import juicebox.HiCGlobals;
-import juicebox.assembly.AssemblyHeatmapHandler;
-import juicebox.assembly.AssemblyScaffoldHandler;
-import juicebox.assembly.Scaffold;
 import juicebox.data.basics.Chromosome;
-import juicebox.gui.SuperAdapter;
-import juicebox.matrix.BasicMatrix;
-import juicebox.matrix.RealMatrixWrapper;
-import juicebox.tools.clt.old.Pearsons;
-import juicebox.track.HiCFixedGridAxis;
-import juicebox.track.HiCFragmentAxis;
-import juicebox.track.HiCGridAxis;
 import juicebox.windowui.HiCZoom;
 import juicebox.windowui.MatrixType;
 import juicebox.windowui.NormalizationType;
-import org.apache.commons.math.linear.Array2DRowRealMatrix;
-import org.apache.commons.math.linear.EigenDecompositionImpl;
-import org.apache.commons.math.linear.RealMatrix;
-import org.apache.commons.math.linear.RealVector;
 import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
@@ -68,16 +53,11 @@ public class MatrixZoomData {
     final Chromosome chr2;  // Chromosome on the Y axis
     private final boolean isIntra;
     final HiCZoom zoom;    // Unit and bin size
-    private final HiCGridAxis xGridAxis;
-    private final HiCGridAxis yGridAxis;
     // Observed values are organized into sub-matrices ("blocks")
     protected final int blockBinCount;   // block size in bins
     protected final int blockColumnCount;     // number of block columns
     // Cache the last 20 blocks loaded
     protected final LRUCache<String, Block> blockCache = new LRUCache<>(500);
-    private final HashMap<NormalizationType, BasicMatrix> pearsonsMap;
-    private final HashMap<NormalizationType, BasicMatrix> normSquaredMaps;
-    private final HashSet<NormalizationType> missingPearsonFiles;
     DatasetReader reader;
     private double averageCount = -1;
     private List<List<ContactRecord>> localCacheOfRecords = null;
@@ -108,7 +88,7 @@ public class MatrixZoomData {
         long correctedBinCount = blockBinCount;
         if (!(this instanceof DynamicMatrixZoomData)) {
             if (reader.getVersion() < 8 && chr1.getLength() < chr2.getLength()) {
-                boolean isFrag = zoom.getUnit() == HiC.Unit.FRAG;
+                boolean isFrag = zoom.getUnit() == HiCZoom.HiCUnit.FRAG;
                 long len1 = chr1.getLength();
                 long len2 = chr2.getLength();
                 if (chr1Sites != null && chr2Sites != null && isFrag) {
@@ -119,41 +99,6 @@ public class MatrixZoomData {
                 correctedBinCount = nBinsX / blockColumnCount + 1;
             }
         }
-
-        if (this instanceof CustomMatrixZoomData || this instanceof DynamicMatrixZoomData) {
-            this.xGridAxis = new HiCFixedGridAxis(chr1.getLength() / zoom.getBinSize() + 1, zoom.getBinSize(), null);
-            this.yGridAxis = new HiCFixedGridAxis(chr2.getLength() / zoom.getBinSize() + 1, zoom.getBinSize(), null);
-        } else if (zoom.getUnit() == HiC.Unit.BP) {
-            this.xGridAxis = new HiCFixedGridAxis(correctedBinCount * blockColumnCount, zoom.getBinSize(), chr1Sites);
-            this.yGridAxis = new HiCFixedGridAxis(correctedBinCount * blockColumnCount, zoom.getBinSize(), chr2Sites);
-        } else if (zoom.getUnit() == HiC.Unit.FRAG) {
-            this.xGridAxis = new HiCFragmentAxis(zoom.getBinSize(), chr1Sites, chr1.getLength());
-            this.yGridAxis = new HiCFragmentAxis(zoom.getBinSize(), chr2Sites, chr2.getLength());
-        } else {
-            System.err.println("Requested " + zoom.getUnit() + " unit; error encountered");
-            this.xGridAxis = null;
-            this.yGridAxis = null;
-        }
-
-        pearsonsMap = new HashMap<>();
-        normSquaredMaps = new HashMap<>();
-        missingPearsonFiles = new HashSet<>();
-    }
-
-    public Chromosome getChr1() {
-        return chr1;
-    }
-
-    public Chromosome getChr2() {
-        return chr2;
-    }
-
-    public HiCGridAxis getXGridAxis() {
-        return xGridAxis;
-    }
-
-    public HiCGridAxis getYGridAxis() {
-        return yGridAxis;
     }
 
     public int getBinSize() {
@@ -197,14 +142,6 @@ public class MatrixZoomData {
         return getKey(chr1, chr2) + "_" + blockNumber + "_" + no;
     }
     
-    public String getColorScaleKey(MatrixType displayOption, NormalizationType n1, NormalizationType n2) {
-        return getKey() + displayOption + "_" + n1 + "_" + n2;
-    }
-    
-    public String getTileKey(int tileRow, int tileColumn, MatrixType displayOption) {
-        return getKey() + "_" + tileRow + "_" + tileColumn + "_ " + displayOption;
-    }
-    
     private static int log2(double v) {
         return (int) (Math.log(v) / Math.log(2));
     }
@@ -227,13 +164,7 @@ public class MatrixZoomData {
         if (reader.getVersion() > 8 && isIntra) {
             return addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no);
         } else {
-            if (HiCGlobals.isAssemblyMatCheck) {
-                return addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, 1, 1);
-            } else if (SuperAdapter.assemblyModeCurrentlyActive && !HiCGlobals.isAssemblyMatCheck) {
-                return addNormalizedBlocksToListAssembly(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no);
-            } else {
-                return addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, fillUnderDiagonal);
-            }
+            return addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, fillUnderDiagonal);
         }
     }
     
@@ -389,113 +320,6 @@ public class MatrixZoomData {
         return new ArrayList<>(new HashSet<>(blockList));
     }
 
-    private List<Block> addNormalizedBlocksToListAssembly(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                          final NormalizationType no) {
-
-        Set<Integer> blocksToLoad = new HashSet<>();
-
-        // get aggregate scaffold handler
-        AssemblyScaffoldHandler aFragHandler = AssemblyHeatmapHandler.getSuperAdapter().getAssemblyStateTracker().getAssemblyHandler();
-
-        final int binSize = zoom.getBinSize();
-        long actualBinSize = binSize;
-        if (chr1.getIndex() == 0 && chr2.getIndex() == 0) {
-            actualBinSize = 1000 * actualBinSize;
-        }
-
-        List<Scaffold> xAxisAggregateScaffolds = aFragHandler.getIntersectingAggregateFeatures(
-                (long) (actualBinSize * binX1 * HiCGlobals.hicMapScale), (long) (actualBinSize * binX2 * HiCGlobals.hicMapScale));
-        List<Scaffold> yAxisAggregateScaffolds = aFragHandler.getIntersectingAggregateFeatures(
-                (long) (actualBinSize * binY1 * HiCGlobals.hicMapScale), (long) (actualBinSize * binY2 * HiCGlobals.hicMapScale));
-    
-        long x1pos, x2pos, y1pos, y2pos;
-
-        for (Scaffold xScaffold : xAxisAggregateScaffolds) {
-            for (Scaffold yScaffold : yAxisAggregateScaffolds) {
-    
-                x1pos = (long) (xScaffold.getOriginalStart() / HiCGlobals.hicMapScale);
-                x2pos = (long) (xScaffold.getOriginalEnd() / HiCGlobals.hicMapScale);
-                y1pos = (long) (yScaffold.getOriginalStart() / HiCGlobals.hicMapScale);
-                y2pos = (long) (yScaffold.getOriginalEnd() / HiCGlobals.hicMapScale);
-    
-                // have to case long because of thumbnail, maybe fix thumbnail instead
-    
-                if (xScaffold.getCurrentStart() < actualBinSize * binX1 * HiCGlobals.hicMapScale) {
-                    if (!xScaffold.getInvertedVsInitial()) {
-                        x1pos = (int) ((xScaffold.getOriginalStart() + actualBinSize * binX1 * HiCGlobals.hicMapScale - xScaffold.getCurrentStart()) / HiCGlobals.hicMapScale);
-                    } else {
-                        x2pos = (int) ((xScaffold.getOriginalStart() - actualBinSize * binX1 * HiCGlobals.hicMapScale + xScaffold.getCurrentEnd()) / HiCGlobals.hicMapScale);
-                    }
-                }
-
-                if (yScaffold.getCurrentStart() < actualBinSize * binY1 * HiCGlobals.hicMapScale) {
-                    if (!yScaffold.getInvertedVsInitial()) {
-                        y1pos = (int) ((yScaffold.getOriginalStart() + actualBinSize * binY1 * HiCGlobals.hicMapScale - yScaffold.getCurrentStart()) / HiCGlobals.hicMapScale);
-                    } else {
-                        y2pos = (int) ((yScaffold.getOriginalStart() - actualBinSize * binY1 * HiCGlobals.hicMapScale + yScaffold.getCurrentEnd()) / HiCGlobals.hicMapScale);
-                    }
-                }
-
-                if (xScaffold.getCurrentEnd() > actualBinSize * binX2 * HiCGlobals.hicMapScale) {
-                    if (!xScaffold.getInvertedVsInitial()) {
-                        x2pos = (int) ((xScaffold.getOriginalStart() + actualBinSize * binX2 * HiCGlobals.hicMapScale - xScaffold.getCurrentStart()) / HiCGlobals.hicMapScale);
-                    } else {
-                        x1pos = (int) ((xScaffold.getOriginalStart() - actualBinSize * binX2 * HiCGlobals.hicMapScale + xScaffold.getCurrentEnd()) / HiCGlobals.hicMapScale);
-                    }
-                }
-
-                if (yScaffold.getCurrentEnd() > actualBinSize * binY2 * HiCGlobals.hicMapScale) {
-                    if (!yScaffold.getInvertedVsInitial()) {
-                        y2pos = (int) ((yScaffold.getOriginalStart() + actualBinSize * binY2 * HiCGlobals.hicMapScale - yScaffold.getCurrentStart()) / HiCGlobals.hicMapScale);
-                    } else {
-                        y1pos = (int) ((yScaffold.getOriginalStart() - actualBinSize * binY2 * HiCGlobals.hicMapScale + yScaffold.getCurrentEnd()) / HiCGlobals.hicMapScale);
-                    }
-                }
-    
-                long[] genomePosition = new long[]{
-                        x1pos, x2pos, y1pos, y2pos
-                };
-
-                List<Integer> tempBlockNumbers = getBlockNumbersForRegionFromGenomePosition(genomePosition);
-                for (int blockNumber : tempBlockNumbers) {
-                    if (!blocksToLoad.contains(blockNumber)) {
-                        String key = getBlockKey(blockNumber, no);
-                        Block b;
-                        //temp fix for AllByAll. TODO: trace this!
-                        if (HiCGlobals.useCache && blockCache.containsKey(key)) {
-                            b = blockCache.get(key);
-                            blockList.add(b);
-                        } else {
-                            blocksToLoad.add(blockNumber);
-                        }
-                    }
-                }
-            }
-        }
-
-        // Remove basic duplicates here
-        // Actually load new blocks
-        actuallyLoadGivenBlocks(blockList, blocksToLoad, no);
-
-        return new ArrayList<>(new HashSet<>(blockList));
-    }
-
-//    private List<Contig2D> retrieveContigsIntersectingWithWindow(Feature2DHandler handler, Rectangle currentWindow) {
-//        List<Feature2D> xAxisFeatures;
-//        if (chr1.getIndex() == 0 && chr2.getIndex() == 0) {
-//            xAxisFeatures = handler.getIntersectingFeatures(1, 1, currentWindow, true);
-//            // helps with disappearing heatmap but doesn't fix everything
-//        } else {
-//            xAxisFeatures = handler.getIntersectingFeatures(chr1.getIndex(), chr2.getIndex(), currentWindow, true);
-//        }
-//        List<Contig2D> axisContigs = new ArrayList<>();
-//        for (Feature2D feature2D : new HashSet<>(xAxisFeatures)) {
-//            axisContigs.add(feature2D.toContig());
-//        }
-//        Collections.sort(axisContigs);
-//        return AssemblyHeatmapHandler.mergeRedundantContiguousContigs(axisContigs);
-//    }
-
     private void actuallyLoadGivenBlocks(final List<Block> blockList, Set<Integer> blocksToLoad,
                                          final NormalizationType no) {
         final AtomicInteger errorCounter = new AtomicInteger();
@@ -517,9 +341,6 @@ public class MatrixZoomData {
                             b = new Block(blockNumber, key);   // An empty block
                         }
                         //Run out of memory if do it here
-                        if (SuperAdapter.assemblyModeCurrentlyActive) {
-                            b = AssemblyHeatmapHandler.modifyBlock(b, key, binSize, chr1Index, chr2Index);
-                        }
                         if (HiCGlobals.useCache) {
                             blockCache.put(key, b);
                         }
@@ -571,9 +392,6 @@ public class MatrixZoomData {
                             b = new Block(blockNumber, key);   // An empty block
                         }
                         //Run out of memory if do it here
-                        if (SuperAdapter.assemblyModeCurrentlyActive) {
-                            b = AssemblyHeatmapHandler.modifyBlock(b, key, binSize, chr1Id, chr2Id);
-                        }
                         if (HiCGlobals.useCache) {
                             blockCache.put(key, b);
                         }
@@ -604,299 +422,6 @@ public class MatrixZoomData {
         if (errorCounter.get() > 0) {
             System.err.println(errorCounter.get() + " errors while reading blocks");
         }
-    }
-
-
-    /**
-     * Return the observed value at the specified location. Supports tooltip text
-     * This implementation is naive, but might get away with it for tooltip.
-     *
-     * @param binX              X bin
-     * @param binY              Y bin
-     * @param normalizationType Normalization type
-     */
-    public float getObservedValue(int binX, int binY, NormalizationType normalizationType) {
-
-        // Intra stores only lower diagonal
-        if (chr1 == chr2) {
-            if (binX > binY) {
-                int tmp = binX;
-                //noinspection SuspiciousNameCombination
-                binX = binY;
-                binY = tmp;
-            }
-        }
-
-        List<Block> blocks = getNormalizedBlocksOverlapping(binX, binY, binX, binY, normalizationType, false, false);
-        if (blocks == null) return 0;
-        for (Block b : blocks) {
-            for (ContactRecord rec : b.getContactRecords()) {
-                if (rec.getBinX() == binX && rec.getBinY() == binY) {
-                    return rec.getCounts();
-                }
-            }
-        }
-        // No record found for this bin
-        return 0;
-    }
-
-//    /**
-//     * Return a slice of the matrix at the specified Y been as a list of wiggle scores
-//     *
-//     * @param binY
-//     */
-//    public List<BasicScore> getSlice(int startBinX, int endBinX, int binY, NormalizationType normalizationType) {
-//
-//        // Intra stores only lower diagonal
-//        if (chr1 == chr2) {
-//            if (binX > binY) {
-//                int tmp = binX;
-//                binX = binY;
-//                binY = tmp;
-//
-//            }
-//        }
-//
-//        List<Block> blocks = getNormalizedBlocksOverlapping(binX, binY, binX, binY, normalizationType);
-//        if (blocks == null) return 0;
-//        for (Block b : blocks) {
-//            for (ContactRecord rec : b.getContactRecords()) {
-//                if (rec.getBinX() == binX && rec.getBinY() == binY) {
-//                    return rec.getCounts();
-//                }
-//            }
-//        }
-//        // No record found for this bin
-//        return 0;
-//    }
-
-    /**
-     * Computes eigenvector from Pearson's.
-     *
-     * @param df    Expected values, needed to get Pearson's
-     * @param which Which eigenvector; 0 is principal.
-     * @return Eigenvector
-     */
-    public double[] computeEigenvector(ExpectedValueFunction df, int which) {
-        BasicMatrix pearsons = getPearsons(df);
-        if (pearsons == null) {
-            return null;
-        }
-
-        int dim = pearsons.getRowDimension();
-        double[][] data = new double[dim][dim];
-        BitSet bitSet = new BitSet(dim);
-        for (int i = 0; i < dim; i++) {
-            for (int j = 0; j < dim; j++) {
-                float tmp = pearsons.getEntry(i, j);
-                data[i][j] = tmp;
-                if (data[i][j] != 0 && !Float.isNaN(tmp)) {
-                    bitSet.set(i);
-                }
-            }
-        }
-
-        int[] nonCentromereColumns = new int[bitSet.cardinality()];
-        int count = 0;
-        for (int i = 0; i < dim; i++) {
-            if (bitSet.get(i)) nonCentromereColumns[count++] = i;
-        }
-
-        RealMatrix subMatrix = new Array2DRowRealMatrix(data).getSubMatrix(nonCentromereColumns, nonCentromereColumns);
-        RealVector rv = (new EigenDecompositionImpl(subMatrix, 0)).getEigenvector(which);
-
-        double[] ev = rv.toArray();
-
-        int size = pearsons.getColumnDimension();
-        double[] eigenvector = new double[size];
-        int num = 0;
-        for (int i = 0; i < size; i++) {
-            if (num < nonCentromereColumns.length && i == nonCentromereColumns[num]) {
-                eigenvector[i] = ev[num];
-                num++;
-            } else {
-                eigenvector[i] = Double.NaN;
-            }
-        }
-        return eigenvector;
-
-    }
-
-    public BasicMatrix getNormSquared(NormalizationType normalizationType) {
-
-        if (normSquaredMaps.containsKey(normalizationType) && normSquaredMaps.get(normalizationType) != null) {
-            return normSquaredMaps.get(normalizationType);
-        }
-
-        // otherwise calculate
-        BasicMatrix normSquared = computeNormSquared(normalizationType);
-        normSquaredMaps.put(normalizationType, normSquared);
-        return normSquared;
-    }
-    
-    // todo only compute local region at high resolution otherwise memory gets exceeded
-    // todo deprecate
-    private BasicMatrix computeNormSquared(NormalizationType normalizationType) {
-        double[] nv1Data = reader.getNormalizationVector(getChr1Idx(), getZoom(), normalizationType).getData().getValues().get(0);
-        double[] nv2Data = reader.getNormalizationVector(getChr2Idx(), getZoom(), normalizationType).getData().getValues().get(0);
-    
-        double[][] matrix = new double[nv1Data.length][nv2Data.length];
-        for (int i = 0; i < nv1Data.length; i++) {
-            for (int j = 0; j < nv2Data.length; j++) {
-                int diff = Math.max(1, Math.abs(i - j));
-                matrix[i][j] = 1 / (nv1Data[i] * nv2Data[j] * diff * diff * diff * diff);
-            }
-        }
-    
-        return new RealMatrixWrapper(new Array2DRowRealMatrix(matrix));
-    }
-
-    /**
-     * Returns the Pearson's matrix; read if available (currently commented out), calculate if small enough.
-     *
-     * @param df Expected values
-     * @return Pearson's matrix or null if not able to calculate or read
-     */
-    public BasicMatrix getPearsons(ExpectedValueFunction df) {
-        boolean readPearsons = false; // check if were able to read in
-        // try to get from local cache
-        BasicMatrix pearsons = pearsonsMap.get(df.getNormalizationType());
-        if (pearsons != null) {
-            return pearsons;
-        }
-        else if (!missingPearsonFiles.contains(df.getNormalizationType())) {
-            // try to read
-            try {
-                pearsons = reader.readPearsons(chr1.getName(), chr2.getName(), zoom, df.getNormalizationType());
-            } catch (IOException e) {
-                pearsons = null;
-                System.err.println(e.getMessage());
-            }
-            if (pearsons != null) {
-                // put it back in the map.
-                pearsonsMap.put(df.getNormalizationType(), pearsons);
-                readPearsons = true;
-            } else {
-                missingPearsonFiles.add(df.getNormalizationType());  // To keep from trying repeatedly
-            }
-        }
-        // we weren't able to read in the Pearsons. check that the resolution is low enough to calculate
-        if (!readPearsons && (zoom.getUnit() == HiC.Unit.BP && zoom.getBinSize() >= HiCGlobals.MAX_PEARSON_ZOOM) ||
-                (zoom.getUnit() == HiC.Unit.FRAG && zoom.getBinSize() >= HiCGlobals.MAX_PEARSON_ZOOM/1000)) {
-            pearsons = computePearsons(df);
-            pearsonsMap.put(df.getNormalizationType(), pearsons);
-        }
-
-        return pearsonsMap.get(df.getNormalizationType());
-    }
-
-    /**
-     * Returns Pearson value at given bin X and Y
-     *
-     * @param binX X bin
-     * @param binY Y bin
-     * @param type Normalization type
-     * @return Pearson's value at this location
-     */
-    public float getPearsonValue(int binX, int binY, NormalizationType type) {
-        BasicMatrix pearsons = pearsonsMap.get(type);
-        if (pearsons != null) {
-            return pearsons.getEntry(binX, binY);
-        } else {
-            return 0;
-        }
-    }
-
-    /**
-     * Compute the Pearson's.  Read in the observed, calculate O/E from the expected value function, subtract the row
-     * means, compute the Pearson's correlation on that matrix
-     *
-     * @param df Expected value
-     * @return Pearson's correlation matrix
-     */
-    private BasicMatrix computePearsons(ExpectedValueFunction df) {
-        if (chr1 != chr2) {
-            throw new RuntimeException("Cannot compute pearsons for non-diagonal matrices");
-        }
-
-        // # of columns.  We could let the data itself define this
-        int dim;
-        if (zoom.getUnit() == HiC.Unit.BP) {
-            //todo currently - pearson only done for resolutions where lossy conversion doesn't matter
-            dim = (int) (chr1.getLength() / zoom.getBinSize()) + 1;
-        } else {
-            dim = ((DatasetReaderV2) reader).getFragCount(chr1) / zoom.getBinSize() + 1;
-        }
-
-        // Compute O/E column vectors
-        double[][] vectors = new double[dim][];
-
-        for (List<ContactRecord> recordList : getContactRecordList()) {
-            for (ContactRecord record : recordList) {
-                int i = record.getBinX();
-                int j = record.getBinY();
-                float counts = record.getCounts();
-                if (Float.isNaN(counts)) continue;
-
-                int dist = Math.abs(i - j);
-                double expected = df.getExpectedValue(chr1.getIndex(), dist);
-                double oeValue = counts / expected;
-
-                double[] vi = vectors[i];
-                if (vi == null) {
-                    vi = new double[dim]; //zeroValue) ;
-                    vectors[i] = vi;
-                }
-                vi[j] = oeValue;
-
-
-                double[] vj = vectors[j];
-                if (vj == null) {
-                    vj = new double[dim]; // zeroValue) ;
-                    vectors[j] = vj;
-                }
-                vj[i] = oeValue;
-
-            }
-        }
-
-        // Subtract row means
-        double[] rowMeans = new double[dim];
-        for (int i = 0; i < dim; i++) {
-            double[] row = vectors[i];
-            rowMeans[i] = row == null ? 0 : getVectorMean(row);
-        }
-
-        for (int j = 0; j < dim; j++) {
-            for (int i = 0; i < dim; i++) {
-                double[] column = vectors[j];
-                if (column == null) continue;
-                column[i] -= rowMeans[i];
-            }
-        }
-
-        BasicMatrix pearsons = Pearsons.computePearsons(vectors, dim);
-        pearsonsMap.put(df.getNormalizationType(), pearsons);
-
-        return pearsons;
-    }
-
-    /**
-     * Return the mean of the given vector, ignoring NaNs
-     *
-     * @param vector Vector to calculate the mean on
-     * @return The mean of the vector, not including NaNs.
-     */
-    private double getVectorMean(double[] vector) {
-        double sum = 0;
-        int count = 0;
-        for (double aVector : vector) {
-            if (!Double.isNaN(aVector)) {
-                sum += aVector;
-                count++;
-            }
-        }
-        return count == 0 ? 0 : sum / count;
     }
 
     /**

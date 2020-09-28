@@ -24,7 +24,6 @@
 
 package juicebox.data;
 
-import juicebox.HiC;
 import juicebox.data.basics.ListOfDoubleArrays;
 import juicebox.windowui.HiCZoom;
 import juicebox.windowui.NormalizationType;
@@ -42,19 +41,19 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 
     private final int binSize;
     private final NormalizationType type;
-    private final HiC.Unit unit;
+    private final HiCZoom.HiCUnit unit;
 
     private final Map<Integer, Double> normFactors;
-	
-	private final ListOfDoubleArrays expectedValues;
-	
-	public ExpectedValueFunctionImpl(NormalizationType type, HiC.Unit unit, int binSize, ListOfDoubleArrays expectedValues, Map<Integer, Double> normFactors) {
-		this.type = type;
-		this.unit = unit;
-		this.binSize = binSize;
-		this.normFactors = normFactors;
-		this.expectedValues = expectedValues;
-	}
+
+    private final ListOfDoubleArrays expectedValues;
+
+    public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize, ListOfDoubleArrays expectedValues, Map<Integer, Double> normFactors) {
+        this.type = type;
+        this.unit = unit;
+        this.binSize = binSize;
+        this.normFactors = normFactors;
+        this.expectedValues = expectedValues;
+    }
 
     public static String getKey(HiCZoom zoom, NormalizationType normType) {
         return zoom.getKey() + "_" + normType;
@@ -132,7 +131,7 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
     }
 
     @Override
-    public HiC.Unit getUnit() {
+    public HiCZoom.HiCUnit getUnit() {
         return unit;
     }
 

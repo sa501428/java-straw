@@ -25,8 +25,6 @@
 
 package juicebox.windowui;
 
-import juicebox.HiC;
-
 import java.util.Objects;
 
 /**
@@ -35,11 +33,11 @@ import java.util.Objects;
  * Time: 9:16 AM
  */
 public class HiCZoom implements Comparable<HiCZoom> {
-	
-	private final HiC.Unit unit;
-	private final Integer binSize;
 
-    public HiCZoom(HiC.Unit unit, int binSize) {
+    private final HiCUnit unit;
+    private final Integer binSize;
+
+    public HiCZoom(HiCUnit unit, int binSize) {
         this.unit = unit;
         this.binSize = binSize;
     }
@@ -49,8 +47,13 @@ public class HiCZoom implements Comparable<HiCZoom> {
         return new HiCZoom(unit, binSize);
     }
 
-    public HiC.Unit getUnit() {
-        return unit;
+    public static HiCUnit valueOfUnit(String unit) {
+        if (unit.equalsIgnoreCase(HiCUnit.BP.toString())) {
+            return HiCUnit.BP;
+        } else if (unit.equalsIgnoreCase(HiCUnit.FRAG.toString())) {
+            return HiCUnit.FRAG;
+        }
+        return null;
     }
 
     public int getBinSize() {
@@ -78,10 +81,16 @@ public class HiCZoom implements Comparable<HiCZoom> {
     @Override
     public int hashCode() {
         return Objects.hash(unit.hashCode(), binSize);
-	}
-	
-	@Override
+    }
+
+    @Override
     public int compareTo(HiCZoom o) {
         return binSize.compareTo(o.binSize);
     }
+
+    public HiCUnit getUnit() {
+        return unit;
+    }
+
+    public enum HiCUnit {BP, FRAG}
 }

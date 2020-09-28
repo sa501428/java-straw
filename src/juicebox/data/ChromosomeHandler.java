@@ -24,16 +24,9 @@
 
 package juicebox.data;
 
-import juicebox.data.anchor.MotifAnchor;
-import juicebox.data.anchor.MotifAnchorParser;
-import juicebox.data.anchor.MotifAnchorTools;
 import juicebox.data.basics.Chromosome;
-import juicebox.data.feature.FeatureFunction;
-import juicebox.data.feature.GenomeWideList;
-import juicebox.track.feature.Feature2DList;
 import org.broad.igv.util.Pair;
 
-import java.io.File;
 import java.util.*;
 
 /**
@@ -44,7 +37,6 @@ public class ChromosomeHandler {
     public final static int CUSTOM_CHROMOSOME_BUFFER = 10; // todo make to smallest value of resolution
     private static final String CHR_ALL = "All";
     private final Map<String, Chromosome> chromosomeMap = new HashMap<>();
-    private final Map<Integer, GenomeWideList<MotifAnchor>> customChromosomeRegions = new HashMap<>();
     private final List<Chromosome> cleanedChromosomes;
     private final String genomeID;
     private final int[] chromosomeBoundaries;
@@ -52,24 +44,13 @@ public class ChromosomeHandler {
     private final Chromosome[] chromosomeArrayWithoutAllByAll;
     private final Chromosome[] chromosomeArrayAutosomesOnly;
 
-    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean inferID) {
-        this(chromosomes, genomeID, inferID, true);
+    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID) {
+        this(chromosomes, genomeID, true);
     }
 
-    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean inferID, boolean createAllChr) {
+    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean createAllChr) {
 
-        if (inferID) {
-            String inferGenomeId = inferGenomeId();
-            // if cannot find matching genomeID, set based on file
-            if (inferGenomeId != null) {
-                this.genomeID = inferGenomeId;
-            } else {
-                this.genomeID = genomeID;
-            }
-        } else {
-            this.genomeID = genomeID;
-        }
-
+        this.genomeID = genomeID;
 
         // set the global chromosome list
         if (createAllChr) {
@@ -129,31 +110,12 @@ public class ChromosomeHandler {
         return name;
     }
 
-    private GenomeWideList<MotifAnchor> generateChromDotSizesBedFile() {
-        GenomeWideList<MotifAnchor> chromDotSizes = new GenomeWideList<>(this);
-
-        for (Chromosome c : getChromosomeArray()) {
-            if (isAllByAll(c) || isGenomeWide(c)) continue;
-            MotifAnchor chromAnchor = new MotifAnchor(c.getName(), 0, (int) c.getLength(), c.getName()); // not implemented or called
-            List<MotifAnchor> anchors = new ArrayList<>();
-            anchors.add(chromAnchor);
-            chromDotSizes.setFeatures("" + c.getIndex(), anchors);
-        }
-
-        return chromDotSizes;
-    }
-
     private boolean isGenomeWide(Chromosome chromosome) {
         return isGenomeWide(chromosome.getName());
     }
 
     private boolean isGenomeWide(String name) {
         return cleanUpName(name).equalsIgnoreCase(GENOMEWIDE_CHR);
-    }
-
-    public Chromosome addGenomeWideChromosome() {
-        GenomeWideList<MotifAnchor> chromDotSizes = generateChromDotSizesBedFile();
-        return addCustomChromosome(chromDotSizes, cleanUpName(GENOMEWIDE_CHR));
     }
 
     public Chromosome generateAssemblyChromosome() {
@@ -172,46 +134,7 @@ public class ChromosomeHandler {
         return newChr;
     }
 
-    public Chromosome generateCustomChromosomeFromBED(File file, int minSize) {
-        GenomeWideList<MotifAnchor> regionsInCustomChromosome =
-                MotifAnchorParser.loadFromBEDFile(this, file.getAbsolutePath());
 
-        MotifAnchorTools.mergeAndExpandSmallAnchors(regionsInCustomChromosome, minSize);
-
-        String cleanedUpName = cleanUpName(file.getName());
-
-        return addCustomChromosome(regionsInCustomChromosome, cleanedUpName);
-    }
-
-    public Chromosome addCustomChromosome(Feature2DList featureList, String chrName) {
-        GenomeWideList<MotifAnchor> featureAnchors =
-                MotifAnchorTools.extractAllAnchorsFromAllFeatures(featureList, this);
-        String cleanedUpName = cleanUpName(chrName);
-        return addCustomChromosome(featureAnchors, cleanedUpName);
-    }
-
-    private int getTotalLengthOfAllRegionsInBedFile(GenomeWideList<MotifAnchor> regionsInCustomChromosome) {
-        final int[] customGenomeLength = new int[]{0};
-        regionsInCustomChromosome.processLists(new FeatureFunction<MotifAnchor>() {
-            @Override
-            public void process(String chr, List<MotifAnchor> featureList) {
-                for (MotifAnchor c : featureList) {
-                    if (c != null) customGenomeLength[0] += c.getWidth() + CUSTOM_CHROMOSOME_BUFFER;
-                }
-            }
-        });
-        return customGenomeLength[0];
-    }
-
-    private Chromosome addCustomChromosome(GenomeWideList<MotifAnchor> regionsInCustomChromosome, String cleanedUpName) {
-        int size = getTotalLengthOfAllRegionsInBedFile(regionsInCustomChromosome);
-        int newIndex = cleanedChromosomes.size();
-        customChromosomeRegions.put(newIndex, regionsInCustomChromosome);
-        Chromosome newChr = new Chromosome(newIndex, cleanedUpName, size);
-        cleanedChromosomes.add(newChr);
-        chromosomeMap.put(newChr.getName(), newChr);
-        return newChr;
-    }
 
     private List<Chromosome> initializeCleanedChromosomesList(List<Chromosome> chromosomes) {
         List<Chromosome> cleanedChromosomes = new ArrayList<>();
@@ -291,14 +214,6 @@ public class ChromosomeHandler {
         }
     }
 
-    public boolean isCustomChromosome(Chromosome chromosome) {
-        return isCustomChromosome(chromosome.getIndex());
-    }
-
-    private boolean isCustomChromosome(int index) {
-        return customChromosomeRegions.containsKey(index);
-    }
-
     public Chromosome getChromosomeFromName(String name) {
         return chromosomeMap.get(cleanUpName(name));
     }
@@ -347,36 +262,6 @@ public class ChromosomeHandler {
 
     public Chromosome[] getChromosomeArrayWithoutAllByAll() {
         return chromosomeArrayWithoutAllByAll;
-    }
-
-    public GenomeWideList<MotifAnchor> getListOfRegionsInCustomChromosome(Integer index) {
-        return customChromosomeRegions.get(index);
-    }
-
-    public String inferGenomeId() {
-        List<String> chrom_sizes = Arrays.asList("hg19", "hg38", "b37", "hg18", "mm10", "mm9", "GRCm38", "aedAeg1",
-                "anasPlat1", "assembly", "bTaurus3", "calJac3", "canFam3", "capHir1", "dm3", "dMel", "EBV", "equCab2",
-                "felCat8", "galGal4", "hg18", "loxAfr3", "macMul1", "macMulBaylor", "oryCun2", "oryLat2", "panTro4",
-                "Pf3D7", "ratNor5", "ratNor6", "sacCer3", "sCerS288c", "spretus", "susScr3", "TAIR10");
-
-        for (String id : chrom_sizes) {
-            ChromosomeHandler handler = HiCFileTools.loadChromosomes(id);
-            for (Chromosome chr : handler.cleanedChromosomes) {
-                for (Chromosome chr2 : this.cleanedChromosomes) {
-                    if (!chr.getName().equalsIgnoreCase("ALL") &&
-                            chr.getName().equals(chr2.getName()) &&
-                            chr.getLength() == chr2.getLength()) {
-                        return id;
-                    }
-                }
-            }
-            // this is more elegant but there's a problem with the Chromosome hashCode
-            //ChromosomeHandler handler1 = this.getIntersectionWith(handler);
-            //if (handler1 != null && handler1.size() > 1) {
-            //    return id;
-            //}
-        }
-        return null;
     }
 
     public Chromosome[] extractOddOrEvenAutosomes(boolean extractOdd) {

@@ -27,8 +27,6 @@ package juicebox.data;
 import htsjdk.samtools.seekablestream.SeekableHTTPStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.tribble.util.LittleEndianInputStream;
-import juicebox.HiCGlobals;
-import juicebox.gui.SuperAdapter;
 import org.broad.igv.ui.util.MessageUtils;
 
 import java.io.BufferedInputStream;
@@ -36,8 +34,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * @author jrobinso
@@ -46,28 +42,10 @@ import java.util.List;
  */
 public class DatasetReaderFactory {
 
-    public static DatasetReader getReader(List<String> fileList) throws IOException {
-
-        if (fileList.size() == 1) {
-            String file = fileList.get(0);
-            return getReaderForFile(file);
-        } else {
-            List<DatasetReaderV2> readers = new ArrayList<>(fileList.size());
-            for (String f : fileList) {
-                DatasetReaderV2 r = getReaderForFile(f);
-                if (r != null) {
-                    readers.add(r);
-                }
-
-            }
-            return new CombinedDatasetReader(readers);
-        }
-    }
-
-    private static DatasetReaderV2 getReaderForFile(String file) throws IOException {
+    public static DatasetReaderV2 getReaderForFile(String file) throws IOException {
         String magicString = getMagicString(file);
 
-        if(magicString != null) {
+        if (magicString != null) {
             if (magicString.equals("HIC")) {
                 return new DatasetReaderV2(file);
             } else {
@@ -92,11 +70,7 @@ public class DatasetReaderFactory {
             try {
                 dis = new LittleEndianInputStream(new FileInputStream(path));
             } catch (Exception e2) {
-                if (HiCGlobals.guiIsCurrentlyActive) {
-                    SuperAdapter.showMessageDialog("File could not be found\n(" + path + ")");
-                } else {
-                    MessageUtils.showErrorMessage("File could not be found\n(" + path + ")", e2);
-                }
+                MessageUtils.showErrorMessage("File could not be found\n(" + path + ")", e2);
             }
         } finally {
             if (stream != null) stream.close();

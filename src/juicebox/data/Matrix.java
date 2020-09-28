@@ -25,12 +25,7 @@
 
 package juicebox.data;
 
-import juicebox.HiC;
-import juicebox.HiCGlobals;
-import juicebox.data.anchor.MotifAnchor;
 import juicebox.data.basics.Chromosome;
-import juicebox.data.feature.FeatureFunction;
-import juicebox.data.feature.GenomeWideList;
 import juicebox.windowui.HiCZoom;
 import org.broad.igv.util.Pair;
 
@@ -68,81 +63,9 @@ public class Matrix {
         initZoomDataMap(zoomDataList);
     }
 
-    public static Matrix createCustomChromosomeMatrix(Chromosome chr1, Chromosome chr2, ChromosomeHandler handler,
-                                                      final Map<String, Matrix> matrices, DatasetReader reader) {
-        // TODO some weird null error when X chr in bed file?
-        List<Chromosome> indicesForChr1 = getIndicesFromSubChromosomes(handler, chr1);
-        List<Chromosome> indicesForChr2;
-        if (chr1.getIndex() == chr2.getIndex()) {
-            indicesForChr2 = new ArrayList<>(indicesForChr1);
-        } else {
-            indicesForChr2 = getIndicesFromSubChromosomes(handler, chr2);
-        }
-
-        if (HiCGlobals.printVerboseComments) {
-            System.out.println("Indices_1 " + indicesForChr1);
-            System.out.println("Indices_2 " + indicesForChr2);
-        }
-
-        // TODO need to sort first!!
-        Chromosome newChr1 = chr1, newChr2 = chr2;
-        if (chr1.getIndex() != chr2.getIndex() && indicesForChr1.get(0).getIndex() > indicesForChr2.get(0).getIndex()) {
-            newChr1 = chr2;
-            newChr2 = chr1;
-        }
-
-        Map<HiCZoom, CustomMatrixZoomData> customZDs = new HashMap<>();
-
-        // ensure all regions loaded
-        for (Chromosome i : indicesForChr1) {
-            for (Chromosome j : indicesForChr2) {
-
-                //System.out.println("from mtrx");
-                String key = Matrix.generateKey(i, j);
-                try {
-                    Matrix m = matrices.get(key);
-                    if (m == null) {
-                        // TODO sometimes this fails once or twice, but later succeeds -
-                        // TODO high priority, needs to be fixed
-                        int numAttempts = 0;
-                        while (m == null && numAttempts < 3) {
-                            numAttempts++;
-                            try {
-                                m = reader.readMatrix(key);
-                            } catch (Exception ignored) {
-                            }
-                        }
-                        if (m == null) {
-                            if (HiCGlobals.printVerboseComments) {
-                                System.out.println("nothing found for cc4 " + i.getName() + " - " + j.getName());
-                            }
-                            continue;
-                        }
-                        matrices.put(key, m);
-                    }
-                    for (MatrixZoomData zd : m.bpZoomData) {
-                        updateCustomZoomDataRegions(newChr1, newChr2, handler, key, zd, customZDs, reader);
-                    }
-                    for (MatrixZoomData zd : m.dynamicBPZoomData) {
-                        updateCustomZoomDataRegions(newChr1, newChr2, handler, key, zd, customZDs, reader);
-                    }
-                    for (MatrixZoomData zd : m.fragZoomData) {
-                        updateCustomZoomDataRegions(newChr1, newChr2, handler, key, zd, customZDs, reader);
-                    }
-                } catch (Exception ee) {
-                    System.err.println("Custom Chr Region Missing " + key);
-                    //ee.printStackTrace();
-                }
-                if (HiCGlobals.printVerboseComments)
-                    System.out.println("completed cc4 " + i.getName() + " - " + j.getName());
-            }
-        }
-        return new Matrix(chr1.getIndex(), chr2.getIndex(), new ArrayList<>(customZDs.values()));
-    }
-
     private void initZoomDataMap(List<MatrixZoomData> zoomDataList) {
         for (MatrixZoomData zd : zoomDataList) {
-            if (zd.getZoom().getUnit() == HiC.Unit.BP) {
+            if (zd.getZoom().getUnit() == HiCZoom.HiCUnit.BP) {
                 bpZoomData.add(zd);
             } else {
                 fragZoomData.add(zd);
@@ -243,46 +166,15 @@ public class Matrix {
         int newRes = resPair.getFirst();
         int highRes = resPair.getSecond();
 
-        MatrixZoomData highMZD = getZoomData(new HiCZoom(HiC.Unit.BP, highRes));
-        MatrixZoomData newMZD = new DynamicMatrixZoomData(new HiCZoom(HiC.Unit.BP, newRes), highMZD);
+        MatrixZoomData highMZD = getZoomData(new HiCZoom(HiCZoom.HiCUnit.BP, highRes));
+        MatrixZoomData newMZD = new DynamicMatrixZoomData(new HiCZoom(HiCZoom.HiCUnit.BP, newRes), highMZD);
         if (addToSet) {
             dynamicZoomResolutions.add(resPair);
         }
         dynamicBPZoomData.add(newMZD);
     }
 
-    private static List<Chromosome> getIndicesFromSubChromosomes(final ChromosomeHandler handler, Chromosome chromosome) {
-        final List<Chromosome> indices = new ArrayList<>();
-        if (handler.isCustomChromosome(chromosome)) {
-            GenomeWideList<MotifAnchor> regions = handler.getListOfRegionsInCustomChromosome(chromosome.getIndex());
-            regions.processLists(new FeatureFunction<MotifAnchor>() {
-                @Override
-                public void process(String chr, List<MotifAnchor> featureList) {
-                    if (featureList.size() > 0) {
-                        Chromosome chromosomeN = handler.getChromosomeFromName(chr);
-                        if (chromosomeN != null) {
-                            indices.add(chromosomeN);
-                        }
-                    }
-                }
-            });
-        } else {
-            indices.add(chromosome);
-        }
 
-        ChromosomeHandler.sort(indices);
-        return indices;
-    }
-
-    private static void updateCustomZoomDataRegions(Chromosome chr1, Chromosome chr2, ChromosomeHandler handler,
-                                                    String regionKey, MatrixZoomData zd,
-                                                    Map<HiCZoom, CustomMatrixZoomData> customZDs, DatasetReader reader) {
-        if (!customZDs.containsKey(zd.getZoom())) {
-            customZDs.put(zd.getZoom(), new CustomMatrixZoomData(chr1, chr2, handler, zd.getZoom(), reader));
-        }
-
-        customZDs.get(zd.getZoom()).expandAvailableZoomDatas(regionKey, zd);
-    }
 
     public static String generateKey(Chromosome chr1, Chromosome chr2) {
         int t1 = Math.min(chr1.getIndex(), chr2.getIndex());
@@ -296,22 +188,22 @@ public class Matrix {
 
     public MatrixZoomData getFirstZoomData() {
         if (bpZoomData != null && bpZoomData.size() > 0) {
-            return getFirstZoomData(HiC.Unit.BP);
-       } else {
-            return getFirstZoomData(HiC.Unit.FRAG);
+            return getFirstZoomData(HiCZoom.HiCUnit.BP);
+        } else {
+            return getFirstZoomData(HiCZoom.HiCUnit.FRAG);
         }
     }
 
-    public MatrixZoomData getFirstZoomData(HiC.Unit unit) {
-        if (unit == HiC.Unit.BP) {
+    public MatrixZoomData getFirstZoomData(HiCZoom.HiCUnit unit) {
+        if (unit == HiCZoom.HiCUnit.BP) {
             return bpZoomData != null && bpZoomData.size() > 0 ? bpZoomData.get(0) : null;
         } else {
             return fragZoomData != null && fragZoomData.size() > 0 ? fragZoomData.get(0) : null;
         }
     }
 
-    public MatrixZoomData getFirstPearsonZoomData(HiC.Unit unit) {
-        if (unit == HiC.Unit.BP) {
+    public MatrixZoomData getFirstPearsonZoomData(HiCZoom.HiCUnit unit) {
+        if (unit == HiCZoom.HiCUnit.BP) {
             return bpZoomData != null ? bpZoomData.get(2) : null;
         } else {
             return fragZoomData != null ? fragZoomData.get(2) : null;
@@ -321,7 +213,7 @@ public class Matrix {
 
     public MatrixZoomData getZoomData(HiCZoom zoom) {
         int targetZoom = zoom.getBinSize();
-        List<MatrixZoomData> zdList = (zoom.getUnit() == HiC.Unit.BP) ? bpZoomData : fragZoomData;
+        List<MatrixZoomData> zdList = (zoom.getUnit() == HiCZoom.HiCUnit.BP) ? bpZoomData : fragZoomData;
         //linear search for bin size, the lists are not large
         for (MatrixZoomData zd : zdList) {
             if (zd.getBinSize() == targetZoom) {
@@ -354,8 +246,8 @@ public class Matrix {
         return null;
     }
 
-    public int getNumberOfZooms(HiC.Unit unit) {
-        return (unit == HiC.Unit.BP) ? bpZoomData.size() : fragZoomData.size();
+    public int getNumberOfZooms(HiCZoom.HiCUnit unit) {
+        return (unit == HiCZoom.HiCUnit.BP) ? bpZoomData.size() : fragZoomData.size();
     }
 
     public boolean isNotIntra() {

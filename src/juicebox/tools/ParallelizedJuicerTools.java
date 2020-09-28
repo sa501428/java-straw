@@ -22,30 +22,32 @@
  *  THE SOFTWARE.
  */
 
-package juicebox.data;
+package juicebox.tools;
 
-import juicebox.data.basics.ListOfDoubleArrays;
-import juicebox.windowui.HiCZoom;
-import juicebox.windowui.NormalizationType;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-/**
- * @author jrobinso
- *         Date: 12/26/12
- *         Time: 9:30 PM
- */
-public interface ExpectedValueFunction {
+public class ParallelizedJuicerTools {
 
-    double getExpectedValue(int chrIdx, long distance);
+    public static void launchParallelizedCode(Runnable runnable) {
+        launchParallelizedCode(Runtime.getRuntime().availableProcessors(), runnable);
+    }
 
-    long getLength();
+    public static void launchParallelizedCode(int numCPUThreads, Runnable runnable) {
+        ExecutorService executor = Executors.newFixedThreadPool(numCPUThreads);
+        for (int l = 0; l < numCPUThreads; l++) {
+            Runnable worker = new Runnable() {
+                @Override
+                public void run() {
+                    runnable.run();
+                }
+            };
+            executor.execute(worker);
+        }
+        executor.shutdown();
 
-    NormalizationType getNormalizationType();
-
-    HiCZoom.HiCUnit getUnit();
-
-    int getBinSize();
-
-    ListOfDoubleArrays getExpectedValuesNoNormalization();
-
-    ListOfDoubleArrays getExpectedValuesWithNormalization(int chrIdx);
+        // Wait until all threads finish
+        while (!executor.isTerminated()) {
+        }
+    }
 }

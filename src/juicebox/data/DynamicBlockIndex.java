@@ -26,7 +26,6 @@ package juicebox.data;
 
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.tribble.util.LittleEndianInputStream;
-import juicebox.tools.utils.original.IndexEntry;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;

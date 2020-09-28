@@ -25,16 +25,10 @@
 
 package juicebox.data;
 
-import juicebox.HiC;
-import juicebox.data.basics.Chromosome;
 import juicebox.data.basics.ListOfDoubleArrays;
-import juicebox.data.basics.ListOfFloatArrays;
-import juicebox.tools.utils.norm.ZeroScale;
 import juicebox.windowui.HiCZoom;
 import juicebox.windowui.NormalizationType;
 
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * @author jrobinso
@@ -45,22 +39,16 @@ public class NormalizationVector {
 
     private final NormalizationType type;
     private final int chrIdx;
-    private final HiC.Unit unit;
+    private final HiCZoom.HiCUnit unit;
     private final int resolution;
     private final ListOfDoubleArrays data;
-    private boolean needsToBeScaledTo = false;
-    
-    public NormalizationVector(NormalizationType type, int chrIdx, HiC.Unit unit, int resolution, ListOfDoubleArrays data) {
+
+    public NormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int resolution, ListOfDoubleArrays data) {
         this.type = type;
         this.chrIdx = chrIdx;
         this.unit = unit;
         this.resolution = resolution;
         this.data = data;
-    }
-    
-    public NormalizationVector(NormalizationType type, int chrIdx, HiC.Unit unit, int resolution, ListOfDoubleArrays data, boolean needsToBeScaledTo) {
-        this(type, chrIdx, unit, resolution, data);
-        this.needsToBeScaledTo = needsToBeScaledTo;
     }
 
     public static String getKey(NormalizationType type, int chrIdx, String unit, int resolution) {
@@ -81,28 +69,5 @@ public class NormalizationVector {
     
     public ListOfDoubleArrays getData() {
         return data;
-    }
-
-    public boolean doesItNeedToBeScaledTo() {
-        return needsToBeScaledTo;
-    }
-
-    public NormalizationVector mmbaScaleToVector(Dataset ds) {
-        Chromosome chromosome = ds.getChromosomeHandler().getChromosomeFromIndex(chrIdx);
-        MatrixZoomData zd = HiCFileTools.getMatrixZoomData(ds, chromosome, chromosome, new HiCZoom(unit, resolution));
-        if (zd == null) return null;
-        return mmbaScaleToVector(zd);
-    }
-
-    public NormalizationVector mmbaScaleToVector(MatrixZoomData zd) {
-
-        List<List<ContactRecord>> listOfLists = new ArrayList<>();
-        listOfLists.addAll(zd.getContactRecordList());
-        ListOfFloatArrays newNormVector = ZeroScale.scale(listOfLists, data.convertToFloats(), getKey());
-        if (newNormVector != null) {
-            newNormVector = ZeroScale.normalizeVectorByScaleFactor(newNormVector, listOfLists);
-        }
-        ListOfDoubleArrays newDoubleNormVector = newNormVector.convertToDoubles();
-        return new NormalizationVector(type, chrIdx, unit, resolution, newDoubleNormVector);
     }
 }

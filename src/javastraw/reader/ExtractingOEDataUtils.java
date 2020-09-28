@@ -36,20 +36,20 @@ public class ExtractingOEDataUtils {
 
     private static final double e = Math.exp(1);
 
-    public static float[][] simpleLog(float[][] matrix) {
+    public static float[][] simpleLog(float[][] matrix, float pseudocount) {
         for (int i = 0; i < matrix.length; i++) {
             for (int j = 0; j < matrix[i].length; j++) {
                 float val = matrix[i][j];
                 if (!Float.isNaN(val)) { // && val > 0
-                    matrix[i][j] = (float) Math.log(val + 1);
+                    matrix[i][j] = (float) Math.log(val + pseudocount);
                 }
             }
         }
         return matrix;
     }
 
-    public static float[][] simpleLogWithCleanup(float[][] matrix) {
-        matrix = simpleLog(matrix);
+    public static float[][] simpleLogWithCleanup(float[][] matrix, float pseudocount) {
+        matrix = simpleLog(matrix, pseudocount);
         for (int i = 0; i < matrix.length; i++) {
             for (int j = 0; j < matrix[0].length; j++) {
                 if (Float.isInfinite(matrix[i][j]) || Math.abs(matrix[i][j]) < 1E-10) {
@@ -74,7 +74,8 @@ public class ExtractingOEDataUtils {
                                                            int binYStart, int binYEnd, int numRows, int numCols,
                                                            NormalizationType normalizationType,
                                                            ExpectedValueFunction df, int chrIndex, double threshold,
-                                                           boolean isIntraFillUnderDiagonal, ThresholdType thresholdType) throws IOException {
+                                                           boolean isIntraFillUnderDiagonal, ThresholdType thresholdType,
+                                                           float pseudocount, float invalidReplacement) throws IOException {
         if (isIntraFillUnderDiagonal && df == null) {
             System.err.println("DF is null");
             return null;
@@ -90,39 +91,45 @@ public class ExtractingOEDataUtils {
                 if (b != null) {
                     for (ContactRecord rec : b.getContactRecords()) {
                         double expected = getExpected(rec, df, chrIndex, isIntraFillUnderDiagonal, averageCount);
-                        double oeVal = rec.getCounts();
+                        double val = rec.getCounts();
+
+                        double observed = val + pseudocount;
+                        expected = expected + pseudocount;
+                        double answer = Double.NaN;
 
                         if (thresholdType.equals(ThresholdType.LOG_BASE_EXP_OF_OBS)) {
 
-                            oeVal = (Math.log(oeVal + e) / Math.log(expected + e));
+                            answer = (Math.log(observed) / Math.log(expected));
 
-                            if (Double.isNaN(oeVal) || Double.isInfinite(oeVal)) {
-                                oeVal = 0;
-                            }
+                        } else if (thresholdType.equals(ThresholdType.TRUE_OE_LOG)
+                                || thresholdType.equals(ThresholdType.LOG_OE_BOUNDED)
+                                || thresholdType.equals(ThresholdType.LOG_OE_BOUNDED_SCALED_BTWN_ZERO_ONE)) {
 
-                        } else if (thresholdType.equals(ThresholdType.TRUE_OE_LOG)) {
-                            //oeVal = (oeVal+1) / (expected+1);
-                            oeVal = Math.log((oeVal + 1) / (expected + 1));
-                        } else if (thresholdType.equals(ThresholdType.TRUE_OE_LINEAR)) {
-                            //oeVal = (oeVal+1) / (expected+1);
-                            oeVal = (oeVal + 1) / (expected + 1);
-                            if (oeVal < 1) {
-                                oeVal = 1 - 1 / oeVal;
-                            } else {
-                                oeVal -= 1;
+                            answer = Math.log(observed / expected);
+                            if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED)) {
+                                answer = Math.min(Math.max(-threshold, answer), threshold);
+                            } else if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED_SCALED_BTWN_ZERO_ONE)) {
+                                answer = Math.min(Math.max(-threshold, answer), threshold);
+                                answer = (answer + threshold) / (2 * threshold);
                             }
-                        } else if (thresholdType.equals(ThresholdType.TRUE_OE)) {
-                            //oeVal = (oeVal+1) / (expected+1);
-                            oeVal = (oeVal + 1) / (expected + 1);
-                        } else if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED)) {
-                            oeVal = Math.log((oeVal + 1) / (expected + 1));
-                            oeVal = Math.min(Math.max(-threshold, oeVal), threshold);
-                        } else if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED_SCALED_BTWN_ZERO_ONE)) {
-                            oeVal = Math.log(oeVal / expected);
-                            oeVal = Math.min(Math.max(-threshold, oeVal), threshold);
-                            oeVal = (oeVal + threshold) / (2 * threshold);
+                        } else if (thresholdType.equals(ThresholdType.TRUE_OE)
+                                || thresholdType.equals(ThresholdType.TRUE_OE_LINEAR)) {
+                            answer = observed / expected;
+                            if (thresholdType.equals(ThresholdType.TRUE_OE_LINEAR)) {
+                                if (answer < 1) {
+                                    answer = 1 - 1 / answer;
+                                } else {
+                                    answer -= 1;
+                                }
+                            }
                         }
-                        placeOEValInRelativePosition(oeVal, rec, binXStart, binYStart, numRows, numCols, data, isIntraFillUnderDiagonal);
+
+                        float floatAnswer = (float) answer;
+                        if (Float.isNaN(floatAnswer) || Float.isInfinite(floatAnswer)) {
+                            floatAnswer = invalidReplacement;
+                        }
+
+                        placeOEValInRelativePosition(floatAnswer, rec, binXStart, binYStart, numRows, numCols, data, isIntraFillUnderDiagonal);
                     }
                 }
             }
@@ -165,13 +172,13 @@ public class ExtractingOEDataUtils {
         }
     }
 
-    private static void placeOEValInRelativePosition(double oeVal, ContactRecord rec, int binXStart, int binYStart,
+    private static void placeOEValInRelativePosition(float oeVal, ContactRecord rec, int binXStart, int binYStart,
                                                      int numRows, int numCols, float[][] data, boolean isIntra) {
         int relativeX = rec.getBinX() - binXStart;
         int relativeY = rec.getBinY() - binYStart;
         if (relativeX >= 0 && relativeX < numRows) {
             if (relativeY >= 0 && relativeY < numCols) {
-                data[relativeX][relativeY] = (float) oeVal;
+                data[relativeX][relativeY] = oeVal;
             }
         }
 
@@ -181,7 +188,7 @@ public class ExtractingOEDataUtils {
             relativeY = rec.getBinX() - binYStart;
             if (relativeX >= 0 && relativeX < numRows) {
                 if (relativeY >= 0 && relativeY < numCols) {
-                    data[relativeX][relativeY] = (float) oeVal;
+                    data[relativeX][relativeY] = oeVal;
                 }
             }
         }

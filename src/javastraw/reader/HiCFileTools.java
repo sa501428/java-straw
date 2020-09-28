@@ -414,28 +414,31 @@ public class HiCFileTools {
         return getMatrixZoomData(ds, chrom1, chrom2, ds.getZoomForBPResolution(resolution));
     }
 
-    public static float[][] getRealOEMatrixForChromosome(Dataset ds, Chromosome chromosome, int resolution, NormalizationType norm,
-                                                         double logThreshold, ExtractingOEDataUtils.ThresholdType thresholdType, boolean fillUnderDiagonal) throws IOException {
+    public static float[][] getOEMatrixForChromosome(Dataset ds, Chromosome chromosome, int resolution, NormalizationType norm,
+                                                     double logThreshold, ExtractingOEDataUtils.ThresholdType thresholdType,
+                                                     boolean fillUnderDiagonal, float pseudocount, float invalidReplacement) throws IOException {
 
         final MatrixZoomData zd = getMatrixZoomData(ds, chromosome, chromosome, resolution);
         if (zd == null) return null;
 
-        return getRealOEMatrixForChromosome(ds, zd, chromosome, resolution, norm, logThreshold, thresholdType, fillUnderDiagonal);
+        return getOEMatrixForChromosome(ds, zd, chromosome, resolution, norm, logThreshold, thresholdType, fillUnderDiagonal,
+                pseudocount, invalidReplacement);
 
     }
 
-    public static float[][] getRealOEMatrixForChromosome(Dataset ds, MatrixZoomData zd, Chromosome chromosome,
-                                                         int resolution, NormalizationType norm, double logThreshold,
-                                                         ExtractingOEDataUtils.ThresholdType thresholdType, boolean fillUnderDiagonal) throws IOException {
+    public static float[][] getOEMatrixForChromosome(Dataset ds, MatrixZoomData zd, Chromosome chromosome,
+                                                     int resolution, NormalizationType norm, double logThreshold,
+                                                     ExtractingOEDataUtils.ThresholdType thresholdType,
+                                                     boolean fillUnderDiagonal, float pseudocount,
+                                                     float invalidReplacement) throws IOException {
 
         ExpectedValueFunction df = ds.getExpectedValuesOrExit(zd.getZoom(), norm, chromosome, true);
 
         int maxBin = (int) (chromosome.getLength() / resolution + 1);
-        int maxSize = maxBin;
 
         return ExtractingOEDataUtils.extractObsOverExpBoundedRegion(zd, 0, maxBin,
-                0, maxBin, maxSize, maxSize, norm, df, chromosome.getIndex(), logThreshold,
-                fillUnderDiagonal, thresholdType);
+                0, maxBin, maxBin, maxBin, norm, df, chromosome.getIndex(), logThreshold,
+                fillUnderDiagonal, thresholdType, pseudocount, invalidReplacement);
 
     }
 }

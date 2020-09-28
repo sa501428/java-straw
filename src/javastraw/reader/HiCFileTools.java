@@ -42,8 +42,13 @@ import java.util.*;
  */
 public class HiCFileTools {
 
-    public static Dataset extractDatasetForCLT(String file, boolean allowPrinting) {
+    public static Dataset extractDatasetForCLT(String filename, boolean allowPrinting) {
         Dataset dataset = null;
+        String file = filename;
+        if (isDropboxURL(file)) {
+            file = cleanUpDropboxURL(file);
+        }
+
         try {
             DatasetReader reader = null;
             if (allowPrinting)
@@ -74,12 +79,16 @@ public class HiCFileTools {
 
     public static DatasetReader extractDatasetReaderForCLT(List<String> files, boolean allowPrinting) {
         DatasetReader reader = null;
+        String file = files.get(0);
+        if (isDropboxURL(file)) {
+            file = cleanUpDropboxURL(file);
+        }
         try {
             if (allowPrinting)
-                System.out.println("Reading file: " + files.get(0));
-            String magicString = DatasetReaderFactory.getMagicString(files.get(0));
+                System.out.println("Reading file: " + file);
+            String magicString = DatasetReaderFactory.getMagicString(file);
             if (magicString.equals("HIC")) {
-                reader = new DatasetReaderV2(files.get(0));
+                reader = new DatasetReaderV2(file);
             } else {
                 System.err.println("This version of HIC is no longer supported");
                 System.exit(32);
@@ -224,32 +233,32 @@ public class HiCFileTools {
     public static RealMatrix extractLocalBoundedRegion(MatrixZoomData zd, long binXStart, long binXEnd,
                                                        long binYStart, long binYEnd, int numRows, int numCols,
                                                        NormalizationType normalizationType, boolean fillUnderDiagonal) throws IOException {
-        
+
         // numRows/numCols is just to ensure a set size in case bounds are approximate
         // left upper corner is reference for 0,0
         List<Block> blocks = getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd, normalizationType, fillUnderDiagonal);
-        
+
         RealMatrix data = MatrixTools.cleanArray2DMatrix(numRows, numCols);
-        
+
         if (blocks.size() > 0) {
             for (Block b : blocks) {
                 if (b != null) {
                     for (ContactRecord rec : b.getContactRecords()) {
-    
+
                         // only called for small regions - should not exceed int
                         int relativeX = (int) (rec.getBinX() - binXStart);
                         int relativeY = (int) (rec.getBinY() - binYStart);
-    
+
                         if (relativeX >= 0 && relativeX < numRows) {
                             if (relativeY >= 0 && relativeY < numCols) {
                                 data.addToEntry(relativeX, relativeY, rec.getCounts());
                             }
                         }
-    
+
                         if (fillUnderDiagonal) {
                             relativeX = (int) (rec.getBinY() - binXStart);
                             relativeY = (int) (rec.getBinX() - binYStart);
-        
+
                             if (relativeX >= 0 && relativeX < numRows) {
                                 if (relativeY >= 0 && relativeY < numCols) {
                                     data.addToEntry(relativeX, relativeY, rec.getCounts());
@@ -263,14 +272,59 @@ public class HiCFileTools {
         // force cleanup
         blocks = null;
         //System.gc();
-        
+
         return data;
     }
-    
+
+    public static float[][] extractLocalBoundedRegionFloatMatrix(MatrixZoomData zd, int binXStart, int binXEnd,
+                                                                 int binYStart, int binYEnd, int numRows, int numCols,
+                                                                 NormalizationType normalizationType, boolean fillUnderDiagonal) throws IOException {
+
+        // numRows/numCols is just to ensure a set size in case bounds are approximate
+        // left upper corner is reference for 0,0
+        List<Block> blocks = getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd, normalizationType, fillUnderDiagonal);
+
+        float[][] data = new float[numRows][numCols];
+
+        if (blocks.size() > 0) {
+            for (Block b : blocks) {
+                if (b != null) {
+                    for (ContactRecord rec : b.getContactRecords()) {
+
+                        int relativeX = rec.getBinX() - binXStart;
+                        int relativeY = rec.getBinY() - binYStart;
+
+                        if (relativeX >= 0 && relativeX < numRows) {
+                            if (relativeY >= 0 && relativeY < numCols) {
+                                data[relativeX][relativeY] = rec.getCounts();
+                            }
+                        }
+
+                        if (fillUnderDiagonal) {
+                            relativeX = rec.getBinY() - binXStart;
+                            relativeY = rec.getBinX() - binYStart;
+
+                            if (relativeX >= 0 && relativeX < numRows) {
+                                if (relativeY >= 0 && relativeY < numCols) {
+                                    data[relativeX][relativeY] = rec.getCounts();
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        // force cleanup
+        blocks = null;
+        //System.gc();
+
+        return data;
+    }
+
     public static List<Block> getAllRegionBlocks(MatrixZoomData zd, long binXStart, long binXEnd,
                                                  long binYStart, long binYEnd,
                                                  NormalizationType normalizationType, boolean fillUnderDiagonal) throws IOException {
-        
+
         List<Block> blocks = Collections.synchronizedList(new ArrayList<>());
         
         int numDataReadingErrors = 0;
@@ -358,5 +412,30 @@ public class HiCFileTools {
 
     public static MatrixZoomData getMatrixZoomData(Dataset ds, Chromosome chrom1, Chromosome chrom2, int resolution) {
         return getMatrixZoomData(ds, chrom1, chrom2, ds.getZoomForBPResolution(resolution));
+    }
+
+    public static float[][] getRealOEMatrixForChromosome(Dataset ds, Chromosome chromosome, int resolution, NormalizationType norm,
+                                                         double logThreshold, ExtractingOEDataUtils.ThresholdType thresholdType, boolean fillUnderDiagonal) throws IOException {
+
+        final MatrixZoomData zd = getMatrixZoomData(ds, chromosome, chromosome, resolution);
+        if (zd == null) return null;
+
+        return getRealOEMatrixForChromosome(ds, zd, chromosome, resolution, norm, logThreshold, thresholdType, fillUnderDiagonal);
+
+    }
+
+    public static float[][] getRealOEMatrixForChromosome(Dataset ds, MatrixZoomData zd, Chromosome chromosome,
+                                                         int resolution, NormalizationType norm, double logThreshold,
+                                                         ExtractingOEDataUtils.ThresholdType thresholdType, boolean fillUnderDiagonal) throws IOException {
+
+        ExpectedValueFunction df = ds.getExpectedValuesOrExit(zd.getZoom(), norm, chromosome, true);
+
+        int maxBin = (int) (chromosome.getLength() / resolution + 1);
+        int maxSize = maxBin;
+
+        return ExtractingOEDataUtils.extractObsOverExpBoundedRegion(zd, 0, maxBin,
+                0, maxBin, maxSize, maxSize, norm, df, chromosome.getIndex(), logThreshold,
+                fillUnderDiagonal, thresholdType);
+
     }
 }

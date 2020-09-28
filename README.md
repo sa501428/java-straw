@@ -56,7 +56,7 @@ Compiling Jars from Source Files
 1. You should have Java 1.8 JDK and Apache Ant installed on your system. See
    below for more information.
 2. Go to the folder containing the Juicebox source files and edit the
-   juicebox.properties file with the proper Java JDK Address.
+   javastraw.properties file with the proper Java JDK Address.
 3. Open the command line, navigate to the folder containing the build.xml file
    and type
      ant

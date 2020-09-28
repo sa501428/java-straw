@@ -1,17 +1,10 @@
 --------------
-About Juicebox
+About Java Straw
 --------------
-Juicebox is visualization software for Hi-C data.  This distribution includes the source code for Juicebox, <a href="https://github.com/theaidenlab/juicer/wiki/Download">Juicer Tools</a>, and <a href="https://aidenlab.org/assembly/">Assembly Tools</a>.  <a href="https://github.com/theaidenlab/juicebox/wiki/Download">Download Juicebox here</a>, or use <a href="https://aidenlab.org/juicebox">Juicebox on the web</a>.  Detailed documentation is available <a href="https://github.com/theaidenlab/juicebox/wiki">on the wiki</a>. Instructions below pertain primarily to usage of command line tools and the Juicebox jar files.
+Java Straw is a library for quickly reading data from the HiC file format, 
+to be used directly in code without dumping data to a local file.
 
-Juicebox can now be used to visualize and interactively (re)assemble genomes. 
-Check out the Juicebox Assembly Tools Module website https://aidenlab.org/assembly for 
-more details on how to use Juicebox for assembly.
-
-
-Juicebox was created by <a href="https://github.com/jrobinso">Jim Robinson</a>,
-<a href="https://github.com/nchernia">Neva C. Durand</a>, and <a href="http://www.erez.com/">Erez Lieberman Aiden</a>. Past contributors include <a href="https://github.com/imachol">Ido Machol</a>, <a href="https://github.com/zgire">Zulkifl Gire</a>, <a href="https://github.com/mhoeger">Marie Hoeger</a>, <a href="https://github.com/asddf123789">Fanny Huang</a>, <a href="https://github.com/mikeehman">Nam Hee Kim</a>, <a href="https://github.com/nguyenkvi">Vi Nguyen</a>, <a href="https://github.com/bluejay9676">Jay Ryu</a>, <a href="https://github.com/musianat">Nathaniel T. Musial</a>, and <a href="https://github.com/ranganmostofa11">Ragib Mostofa</a>.
-
-Ongoing development work is carried out by <a href="https://github.com/sa501428">Muhammad Saad Shamim</a>, <a href="https://github.com/nchernia">Neva C. Durand</a>, and <a href="https://github.com/dudcha">Olga Dudchenko</a>.
+Ongoing development work is carried out by <a href="https://github.com/sa501428">Muhammad Saad Shamim</a>, <a href="https://github.com/nchernia">Neva C. Durand</a>, and <a href="https://github.com/suhas-rao">Suhas Rao</a>.
 
 --------------
 Questions?
@@ -38,13 +31,7 @@ The former turns on all warnings, the latter gives some flexibility since some p
 * You'll create two of these, one for the GUI (call it Juicebox GUI or whatever you want, really) and one for the CLT.
 * Set the main class by clicking the little `...` button next to the text box for main class
 
-        MainWindow.java is the main method class for the visualization/GUI portion of the software.
         HiCTools.java is the main method class for the analysis/CLT portion.
-
-* For the GUI under VM Options:
-
-        -Xmx2000m
-        -Djnlp.loadMenu="https://hicfiles.tc4ga.com/juicebox.properties"
 
 * For the CLT use
 
@@ -57,41 +44,11 @@ but don't worry about that for development; 2GB should be fine.
 * One last note: be sure to `Commit and Push` when you commit files, it's hidden in the dropdown menu button in the
 commit window.
 
-----------------------------------
-Hardware and Software Requirements
-----------------------------------
-The minimum software requirement to run Juicebox is a working Java installation
-(version > 1.6) on Windows, Linux, and Mac OSX.  We recommend using the latest
-Java version available, but please do not use the Java Beta Version. Minimum
-system requirements for running Java can be found at
-https://java.com/en/download/help/sysreq.xml. To download and install the latest
-Java Runtime Environment (JRE), please go to https://www.java.com/download.
-
-We recommend having at least 2GB free RAM for the best user experience with
-Juicebox.
-
-To launch the Juicebox application from command line, type
-  java -Xms512m -Xmx2048m -jar Juicebox.jar
-
-Note: the -Xms512m flag sets the minimum memory heap size at 512 megabytes, and
-the -Xmx2048m flag sets the maximum size at 2048 megabytes (2 gigabytes). These
-values may be adjusted as appropriate for your machine.
-
 -------------
 Documentation
 -------------
-We have extensive documentation for how to use Juicebox at
-https://github.com/theaidenlab/juicebox/wiki including a video, a Quick Start Guide, and a
-detailed tutorial.
-
-For using Juicebox to assemble genomes see https://www.aidenlab.org/assembly/.
-
-------------------------
-Command Line Tools Usage
-------------------------
-
-See the documentation at https://github.com/theaidenlab/juicer/wiki for information
-on how to use the Juicer tools.
+We have documentation for how to use Java Straw at
+https://github.com/aidenlab/java-straw/wiki.
 
 --------------------------------
 Compiling Jars from Source Files

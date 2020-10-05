@@ -946,8 +946,8 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                                 int rowCount = dis.readShort();
                                 for (int i = 0; i < rowCount; i++) {
                                     int binY = binYOffset + dis.readShort();
-                                    int colCount = dis.readShort();
-                                    for (int j = 0; j < colCount; j++) {
+                                    short colCount = dis.readShort();
+                                    for (short j = 0; j < colCount; j++) {
                                         int binX = binXOffset + dis.readShort();
                                         float counts = useShort ? dis.readShort() : dis.readFloat();
                                         records.add(new ContactRecord(binX, binY, counts));
@@ -968,8 +968,8 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             
                             } else if (!useShortBinX && useShortBinY) {
                                 // List-of-rows representation
-                                int rowCount = dis.readShort();
-                                for (int i = 0; i < rowCount; i++) {
+                                short rowCount = dis.readShort();
+                                for (short i = 0; i < rowCount; i++) {
                                     int binY = binYOffset + dis.readShort();
                                     int colCount = dis.readInt();
                                     for (int j = 0; j < colCount; j++) {

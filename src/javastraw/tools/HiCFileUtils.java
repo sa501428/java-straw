@@ -42,16 +42,16 @@ import java.util.Map;
  */
 
 class HiCFileUtils {
-	
-	private final Dataset dataset;
 
-    private HiCFileUtils(String hicfile) throws IOException {
-        DatasetReaderV2 reader = new DatasetReaderV2(hicfile);
+    private final Dataset dataset;
+
+    private HiCFileUtils(String hicfile, boolean useCache) throws IOException {
+        DatasetReaderV2 reader = new DatasetReaderV2(hicfile, useCache);
         dataset = reader.read();
     }
 
     public static void main(String[] args) throws IOException {
-        HiCFileUtils utils = new HiCFileUtils(args[0]);
+        HiCFileUtils utils = new HiCFileUtils(args[0], false);
         utils.dumpNormalizationVectors(NormalizationHandler.KR, "1", HiCZoom.HiCUnit.BP, 250000);
         utils.dumpExpectedVectors(NormalizationHandler.KR, HiCZoom.HiCUnit.BP, 1000000);
     }

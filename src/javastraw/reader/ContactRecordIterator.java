@@ -24,7 +24,6 @@
 
 package javastraw.reader;
 
-import javastraw.HiCGlobals;
 import javastraw.reader.basics.Block;
 import javastraw.reader.basics.ContactRecord;
 import javastraw.type.NormalizationHandler;
@@ -45,16 +44,19 @@ class ContactRecordIterator implements Iterator<ContactRecord> {
     private final DatasetReader reader;
     private final MatrixZoomData zd;
     private final LRUCache<String, Block> blockCache;
-    
+    private final boolean useCache;
+
     /**
      * Initializes the iterator
      */
-    ContactRecordIterator(DatasetReader reader, MatrixZoomData zd, LRUCache<String, Block> blockCache) {
+    ContactRecordIterator(DatasetReader reader, MatrixZoomData zd, LRUCache<String, Block> blockCache,
+                          boolean useCache) {
         this.reader = reader;
         this.zd = zd;
         this.blockCache = blockCache;
         this.blockIdx = -1;
         this.blockNumbers = reader.getBlockNumbers(zd);
+        this.useCache = useCache;
     }
 
     /**
@@ -77,7 +79,7 @@ class ContactRecordIterator implements Iterator<ContactRecord> {
                     // Optionally check the cache
                     String key = zd.getBlockKey(blockNumber, NormalizationHandler.NONE);
                     Block nextBlock;
-                    if (HiCGlobals.useCache && blockCache.containsKey(key)) {
+                    if (useCache && blockCache.containsKey(key)) {
                         nextBlock = blockCache.get(key);
                     } else {
                         nextBlock = reader.readNormalizedBlock(blockNumber, zd, NormalizationHandler.NONE);

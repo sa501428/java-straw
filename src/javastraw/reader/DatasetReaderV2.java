@@ -67,6 +67,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     private boolean activeStatus = true;
     private final AtomicBoolean useMainStream = new AtomicBoolean();
     public static double[] globalTimeDiffThings = new double[5];
+    private boolean useCache = true;
 
     @Override
     public Dataset read() throws IOException {
@@ -226,6 +227,10 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         blockIndexMap = Collections.synchronizedMap(new HashMap<>());
     }
 
+    public DatasetReaderV2(String path, boolean useCache) throws IOException {
+        this(path);
+        this.useCache = useCache;
+    }
 
     public String readStats() throws IOException {
         String statsFileName = path.substring(0, path.lastIndexOf('.')) + "_stats.html";
@@ -280,6 +285,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
         MatrixZoomData zd = new MatrixZoomData(chr1, chr2, zoom, blockBinCount, blockColumnCount, chr1Sites, chr2Sites,
                 this);
+        zd.setUseCache(useCache);
 
         int nBlocks = dis.readInt();
 

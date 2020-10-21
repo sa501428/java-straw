@@ -64,6 +64,7 @@ public class MatrixZoomData {
     private double averageCount = -1;
     private List<List<ContactRecord>> localCacheOfRecords = null;
     private long numberOfContactRecords = 0;
+    private boolean useCache = true;
 
     /**
      * Constructor, sets the grid axes.  Called when read from file.
@@ -86,21 +87,10 @@ public class MatrixZoomData {
         this.reader = reader;
         this.blockBinCount = blockBinCount;
         this.blockColumnCount = blockColumnCount;
+    }
 
-        long correctedBinCount = blockBinCount;
-        if (!(this instanceof DynamicMatrixZoomData)) {
-            if (reader.getVersion() < 8 && chr1.getLength() < chr2.getLength()) {
-                boolean isFrag = zoom.getUnit() == HiCZoom.HiCUnit.FRAG;
-                long len1 = chr1.getLength();
-                long len2 = chr2.getLength();
-                if (chr1Sites != null && chr2Sites != null && isFrag) {
-                    len1 = chr1Sites.length + 1;
-                    len2 = chr2Sites.length + 1;
-                }
-                long nBinsX = Math.max(len1, len2) / zoom.getBinSize() + 1;
-                correctedBinCount = nBinsX / blockColumnCount + 1;
-            }
-        }
+    public void setUseCache(boolean useCache) {
+        this.useCache = useCache;
     }
 
     public int getBinSize() {
@@ -178,7 +168,7 @@ public class MatrixZoomData {
         int blockNumber = getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth);
         String key = getBlockKey(blockNumber, no);
         Block b;
-        if (HiCGlobals.useCache && blockCache.containsKey(key)) {
+        if (useCache && blockCache.containsKey(key)) {
             b = blockCache.get(key);
             blockList.add(b);
         } else {
@@ -254,7 +244,7 @@ public class MatrixZoomData {
         int blockNumber = r * getBlockColumnCount() + c;
         String key = getBlockKey(blockNumber, no);
         Block b;
-        if (HiCGlobals.useCache && blockCache.containsKey(key)) {
+        if (useCache && blockCache.containsKey(key)) {
             b = blockCache.get(key);
             blockList.add(b);
         } else {
@@ -346,7 +336,7 @@ public class MatrixZoomData {
                             b = new Block(blockNumber, key);   // An empty block
                         }
                         //Run out of memory if do it here
-                        if (HiCGlobals.useCache) {
+                        if (useCache) {
                             blockCache.put(key, b);
                         }
                         blockList.add(b);
@@ -397,7 +387,7 @@ public class MatrixZoomData {
                             b = new Block(blockNumber, key);   // An empty block
                         }
                         //Run out of memory if do it here
-                        if (HiCGlobals.useCache) {
+                        if (useCache) {
                             blockCache.put(key, b);
                         }
                         blockList.add(b);
@@ -763,7 +753,7 @@ public class MatrixZoomData {
             List<ContactRecord> currentList = new ArrayList<>(1000000);
             int localCounter = 0;
             int maxAllowed = 9 * (Integer.MAX_VALUE / 10);
-            Iterator<ContactRecord> iterator = new ContactRecordIterator(reader, this, blockCache);
+            Iterator<ContactRecord> iterator = new ContactRecordIterator(reader, this, blockCache, useCache);
             while (iterator.hasNext()) {
                 ContactRecord cr = iterator.next();
                 currentList.add(cr);

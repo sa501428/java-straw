@@ -42,7 +42,7 @@ import java.util.*;
  */
 public class HiCFileTools {
 
-    public static Dataset extractDatasetForCLT(String filename, boolean allowPrinting) {
+    public static Dataset extractDatasetForCLT(String filename, boolean allowPrinting, boolean useCache) {
         Dataset dataset = null;
         String file = filename;
         if (isDropboxURL(file)) {
@@ -55,7 +55,7 @@ public class HiCFileTools {
                 System.out.println("Reading file: " + file);
             String magicString = DatasetReaderFactory.getMagicString(file);
             if (magicString.equals("HIC")) {
-                reader = new DatasetReaderV2(file);
+                reader = new DatasetReaderV2(file, useCache);
             } else {
                 System.err.println("This version of HIC is no longer supported");
                 System.exit(32);
@@ -77,7 +77,7 @@ public class HiCFileTools {
         }
     }
 
-    public static DatasetReader extractDatasetReaderForCLT(List<String> files, boolean allowPrinting) {
+    public static DatasetReader extractDatasetReaderForCLT(List<String> files, boolean allowPrinting, boolean useCache) {
         DatasetReader reader = null;
         String file = files.get(0);
         if (isDropboxURL(file)) {
@@ -88,7 +88,7 @@ public class HiCFileTools {
                 System.out.println("Reading file: " + file);
             String magicString = DatasetReaderFactory.getMagicString(file);
             if (magicString.equals("HIC")) {
-                reader = new DatasetReaderV2(file);
+                reader = new DatasetReaderV2(file, useCache);
             } else {
                 System.err.println("This version of HIC is no longer supported");
                 System.exit(32);

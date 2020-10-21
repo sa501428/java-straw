@@ -30,14 +30,13 @@ package javastraw;
  */
 public class HiCGlobals {
 
-    public static final String versionNum = "1.00.00";
+    public static final String versionNum = "1.01.00";
 
     // min hic file version supported
     public static final int minVersion = 6;
     public static final int bufferSize = 2097152;
 
     // implement Map scaling with this global variable
-    public static boolean useCache = true;
     public static boolean allowDynamicBlockIndex = true;
     public static boolean printVerboseComments = false;
 }

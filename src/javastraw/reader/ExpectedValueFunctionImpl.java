@@ -28,6 +28,7 @@ import javastraw.reader.basics.ListOfDoubleArrays;
 import javastraw.type.HiCZoom;
 import javastraw.type.NormalizationType;
 
+import java.io.IOException;
 import java.util.Map;
 
 /**
@@ -39,32 +40,52 @@ import java.util.Map;
  */
 public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 
-    private final int binSize;
-    private final NormalizationType type;
-    private final HiCZoom.HiCUnit unit;
+	private final DatasetReader reader;
+	private final int binSize;
+	private final NormalizationType type;
+	private final HiCZoom.HiCUnit unit;
+	private final Map<Integer, Double> normFactors;
+	private final long nValues;
+	private final long filePosition;
+	private final int streamSize = 500000;
+	private int version = -1;
+	private ListOfDoubleArrays expectedValues;
+	private long streamBound1 = 0;
+	private long streamBound2 = 0;
 
-    private final Map<Integer, Double> normFactors;
+	public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize, ListOfDoubleArrays expectedValues, Map<Integer, Double> normFactors) {
+		this.type = type;
+		this.unit = unit;
+		this.binSize = binSize;
+		this.normFactors = normFactors;
+		this.expectedValues = expectedValues;
+		this.nValues = expectedValues.getLength();
+		this.filePosition = 0;
+		this.reader = null;
+	}
 
-    private final ListOfDoubleArrays expectedValues;
+	public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize, long nValues, long filePosition, Map<Integer, Double> normFactors, DatasetReader reader) {
+		this.type = type;
+		this.unit = unit;
+		this.binSize = binSize;
+		this.normFactors = normFactors;
+		this.expectedValues = null;
+		this.nValues = nValues;
+		this.filePosition = filePosition;
+		this.reader = reader;
+		this.version = reader.getVersion();
+	}
 
-    public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize, ListOfDoubleArrays expectedValues, Map<Integer, Double> normFactors) {
-        this.type = type;
-        this.unit = unit;
-        this.binSize = binSize;
-        this.normFactors = normFactors;
-        this.expectedValues = expectedValues;
-    }
+	public static String getKey(HiCZoom zoom, NormalizationType normType) {
+		return zoom.getKey() + "_" + normType;
+	}
 
-    public static String getKey(HiCZoom zoom, NormalizationType normType) {
-        return zoom.getKey() + "_" + normType;
-    }
+	// This is exposed for testing, should not use directly
+	public Map<Integer, Double> getNormFactors() {
+		return normFactors;
+	}
 
-    // This is exposed for testing, should not use directly
-    public Map<Integer, Double> getNormFactors() {
-        return normFactors;
-    }
-	
-	
+
 	/**
 	 * Expected value vector.  No chromosome normalization
 	 *
@@ -72,9 +93,19 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 	 */
 	@Override
 	public ListOfDoubleArrays getExpectedValuesNoNormalization() {
+		if (expectedValues == null && (streamBound1 == 0 && streamBound2 == 0)) {
+			try {
+				expectedValues = reader.readExpectedVectorPart(filePosition, nValues);
+				streamBound1 = 0;
+				streamBound2 = 0;
+			} catch (IOException e) {
+				System.err.println("Error reading expected vector");
+				e.printStackTrace();
+			}
+		}
 		return expectedValues;
 	}
-	
+
 	/**
 	 * Gets the expected value, distance and coverage normalized, chromosome-length normalized
 	 *
@@ -84,32 +115,69 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 	 */
 	@Override
 	public double getExpectedValue(int chrIdx, long distance) {
-		
 		double normFactor = 1.0;
+		long streamIndex;
 		if (normFactors != null && normFactors.containsKey(chrIdx)) {
 			normFactor = normFactors.get(chrIdx);
 		}
-		
-		if (expectedValues.getLength() > 0) {
-			if (distance >= expectedValues.getLength()) {
-				return expectedValues.getLastValue() / normFactor;
-			} else {
-				return expectedValues.get(distance) / normFactor;
+		if (expectedValues == null) {
+			streamBound1 = Math.max(0, distance - (streamSize / 2));
+			streamBound2 = streamBound1 + streamSize;
+			long position = version > 8 ? filePosition + (streamBound1 * 4) : filePosition + (streamBound1 * 8);
+			try {
+				expectedValues = reader.readExpectedVectorPart(position, streamSize);
+			} catch (IOException e) {
+				System.err.println("Error reading expected vector");
+				e.printStackTrace();
 			}
+		}
+
+		if (streamBound1 == 0 && streamBound2 == 0) {
+			if (expectedValues.getLength() > 0) {
+				if (distance >= expectedValues.getLength()) {
+					return expectedValues.getLastValue() / normFactor;
+				} else {
+					return expectedValues.get(distance) / normFactor;
+				}
+			} else {
+				System.err.println("Expected values array is empty");
+				return -1;
+			}
+		} else if (distance >= streamBound1 && distance < streamBound2) {
+			streamIndex = distance - streamBound1;
+			return expectedValues.get(streamIndex) / normFactor;
 		} else {
-			System.err.println("Expected values array is empty");
-			return -1;
+			streamBound1 = Math.max(0, distance - (streamSize / 2));
+			streamBound2 = streamBound1 + streamSize;
+			long position = version > 8 ? filePosition + (streamBound1 * 4) : filePosition + (streamBound1 * 8);
+			try {
+				expectedValues = reader.readExpectedVectorPart(position, streamSize);
+			} catch (IOException e) {
+				System.err.println("Error reading expected vector");
+				e.printStackTrace();
+			}
+			streamIndex = distance - streamBound1;
+			return expectedValues.get(streamIndex) / normFactor;
 		}
 	}
-	
+
 	@Override
 	public ListOfDoubleArrays getExpectedValuesWithNormalization(int chrIdx) {
-		
+		if (expectedValues == null && (streamBound1 == 0 && streamBound2 == 0)) {
+			try {
+				expectedValues = reader.readExpectedVectorPart(filePosition, nValues);
+				streamBound1 = 0;
+				streamBound2 = 0;
+			} catch (IOException e) {
+				System.err.println("Error reading expected vector");
+				e.printStackTrace();
+			}
+		}
 		double normFactor = 1.0;
 		if (normFactors != null && normFactors.containsKey(chrIdx)) {
 			normFactor = normFactors.get(chrIdx);
 		}
-		
+
 		if (expectedValues.getLength() > 0) {
 			ListOfDoubleArrays normedExpectedValues = expectedValues.deepClone();
 			normedExpectedValues.multiplyEverythingBy(1.0 / normFactor);
@@ -119,25 +187,25 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 			return null;
 		}
 	}
-	
+
 	@Override
 	public long getLength() {
-		return expectedValues.getLength();
+		return nValues;
 	}
 
-    @Override
-    public NormalizationType getNormalizationType() {
-        return type;
-    }
+	@Override
+	public NormalizationType getNormalizationType() {
+		return type;
+	}
 
-    @Override
-    public HiCZoom.HiCUnit getUnit() {
-        return unit;
-    }
+	@Override
+	public HiCZoom.HiCUnit getUnit() {
+		return unit;
+	}
 
-    @Override
-    public int getBinSize() {
-        return binSize;
-    }
+	@Override
+	public int getBinSize() {
+		return binSize;
+	}
 
 }

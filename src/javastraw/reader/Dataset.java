@@ -43,6 +43,7 @@ import java.util.*;
  */
 public class Dataset {
 
+    private static final String V9_DEPTH_BASE = "v9-depth-base";
     private final Map<String, Matrix> matrices = new HashMap<>(625);
     private final DatasetReader reader;
     private final LRUCache<String, double[]> eigenvectorCache;
@@ -52,6 +53,7 @@ public class Dataset {
     String genomeId;
     String restrictionEnzyme = null;
     List<HiCZoom> bpZooms, dynamicZooms, fragZooms;
+    private int v9DepthBase = 0;
     private List<Integer> bpZoomResolutions;
     private Map<String, String> attributes;
     private Map<String, Integer> fragmentCounts;
@@ -220,6 +222,11 @@ public class Dataset {
 
     public void setAttributes(Map<String, String> map) {
         this.attributes = map;
+        try {
+            v9DepthBase = Integer.parseInt(attributes.get(V9_DEPTH_BASE));
+        } catch (Exception e) {
+            v9DepthBase = 0;
+        }
     }
 
 
@@ -427,5 +434,9 @@ public class Dataset {
 
     public NormalizationHandler getNormalizationHandler() {
         return normalizationHandler;
+    }
+
+    public int getDepthBase() {
+        return v9DepthBase;
     }
 }

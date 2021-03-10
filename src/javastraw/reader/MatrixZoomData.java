@@ -60,10 +60,10 @@ public class MatrixZoomData {
     protected final int blockColumnCount;     // number of block columns
     // Cache the last 20 blocks loaded
     protected final LRUCache<String, Block> blockCache = new LRUCache<>(500);
-    DatasetReader reader;
+    private final V9Depth v9Depth;
     private double averageCount = -1;
-    private List<List<ContactRecord>> localCacheOfRecords = null;
-    private long numberOfContactRecords = 0;
+    protected DatasetReader reader;
+    private IteratorContainer iteratorContainer = null;
     private boolean useCache = true;
 
     /**
@@ -86,11 +86,39 @@ public class MatrixZoomData {
         this.isIntra = chr1.getIndex() == chr2.getIndex();
         this.reader = reader;
         this.blockBinCount = blockBinCount;
+        if (reader.getVersion() > 8) {
+            v9Depth = V9Depth.setDepthMethod(reader.getDepthBase(), blockBinCount);
+        } else {
+            v9Depth = new LogDepth(2, blockBinCount);
+        }
         this.blockColumnCount = blockColumnCount;
+
+        long correctedBinCount = blockBinCount;
+        if (!(this instanceof DynamicMatrixZoomData)) {
+            if (reader.getVersion() < 8 && chr1.getLength() < chr2.getLength()) {
+                boolean isFrag = zoom.getUnit() == HiCZoom.HiCUnit.FRAG;
+                long len1 = chr1.getLength();
+                long len2 = chr2.getLength();
+                if (chr1Sites != null && chr2Sites != null && isFrag) {
+                    len1 = chr1Sites.length + 1;
+                    len2 = chr2Sites.length + 1;
+                }
+                long nBinsX = Math.max(len1, len2) / zoom.getBinSize() + 1;
+                correctedBinCount = nBinsX / blockColumnCount + 1;
+            }
+        }
     }
 
     public void setUseCache(boolean useCache) {
         this.useCache = useCache;
+    }
+
+    public Chromosome getChr1() {
+        return chr1;
+    }
+
+    public Chromosome getChr2() {
+        return chr2;
     }
 
     public int getBinSize() {
@@ -133,11 +161,7 @@ public class MatrixZoomData {
     private String getBlockKey(int blockNumber, NormalizationType no, int chr1, int chr2) {
         return getKey(chr1, chr2) + "_" + blockNumber + "_" + no;
     }
-    
-    private static int log2(double v) {
-        return (int) (Math.log(v) / Math.log(2));
-    }
-    
+
     /**
      * Return the blocks of normalized, observed values overlapping the rectangular region specified.
      * The units are "bins"
@@ -151,7 +175,7 @@ public class MatrixZoomData {
      */
     public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2, final NormalizationType no,
                                                       boolean isImportant, boolean fillUnderDiagonal) {
-        
+
         final List<Block> blockList = Collections.synchronizedList(new ArrayList<>());
         if (reader.getVersion() > 8 && isIntra) {
             return addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no);
@@ -159,11 +183,45 @@ public class MatrixZoomData {
             return addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, fillUnderDiagonal);
         }
     }
-    
+
+    /**
+     * // for reference
+     * public int getBlockNumberVersion9(int binI, int binJ) {
+     * //int numberOfBlocksOnDiagonal = numberOfBinsInThisIntraMatrixAtResolution / blockSizeInBinCount + 1;
+     * // assuming number of blocks on diagonal is blockClolumnSize
+     * int depth = v9Depth.getDepth(binI, binJ);
+     * int positionAlongDiagonal = ((binI + binJ) / 2 / blockBinCount);
+     * return getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth);
+     * }
+     * <p>
+     * public int[] getBlockBoundsFromNumberVersion9Up(int blockNumber) {
+     * int positionAlongDiagonal = blockNumber % blockColumnCount;
+     * int depth = blockNumber / blockColumnCount;
+     * int avgPosition1 = positionAlongDiagonal * blockBinCount;
+     * int avgPosition2 = (positionAlongDiagonal + 1) * blockBinCount;
+     * double difference1 = (Math.pow(2, depth) - 1) * blockBinCount * Math.sqrt(2);
+     * double difference2 = (Math.pow(2, depth + 1) - 1) * blockBinCount * Math.sqrt(2);
+     * int c1 = avgPosition1 + (int) difference1 / 2 - 1;
+     * int c2 = avgPosition2 + (int) difference2 / 2 + 1;
+     * int r1 = avgPosition1 - (int) difference2 / 2 - 1;
+     * int r2 = avgPosition2 - (int) difference1 / 2 + 1;
+     * return new int[]{c1, c2, r1, r2};
+     * }
+     * <p>
+     * public int[] getBlockBoundsFromNumberVersion8Below(int blockNumber) {
+     * int c = (blockNumber % blockColumnCount);
+     * int r = blockNumber / blockColumnCount;
+     * int c1 = c * blockBinCount;
+     * int c2 = c1 + blockBinCount - 1;
+     * int r1 = r * blockBinCount;
+     * int r2 = r1 + blockBinCount - 1;
+     * return new int[]{c1, c2, r1, r2};
+     * }
+     */
     public int getBlockNumberVersion9FromPADAndDepth(int positionAlongDiagonal, int depth) {
         return depth * blockColumnCount + positionAlongDiagonal;
     }
-    
+
     private void populateBlocksToLoadV9(int positionAlongDiagonal, int depth, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
         int blockNumber = getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth);
         String key = getBlockKey(blockNumber, no);
@@ -175,40 +233,7 @@ public class MatrixZoomData {
             blocksToLoad.add(blockNumber);
         }
     }
-    
-    // for reference
-    public int getBlockNumberVersion9(int binI, int binJ) {
-        //int numberOfBlocksOnDiagonal = numberOfBinsInThisIntraMatrixAtResolution / blockSizeInBinCount + 1;
-        // assuming number of blocks on diagonal is blockClolumnSize
-        int depth = log2(1 + Math.abs(binI - binJ) / Math.sqrt(2) / blockBinCount);
-        int positionAlongDiagonal = ((binI + binJ) / 2 / blockBinCount);
-        return getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth);
-    }
 
-    public int[] getBlockBoundsFromNumberVersion9Up(int blockNumber) {
-        int positionAlongDiagonal = blockNumber % blockColumnCount;
-        int depth = blockNumber / blockColumnCount;
-        int avgPosition1 = positionAlongDiagonal * blockBinCount;
-        int avgPosition2 = (positionAlongDiagonal + 1) * blockBinCount;
-        double difference1 = (Math.pow(2, depth) - 1) * blockBinCount * Math.sqrt(2);
-        double difference2 = (Math.pow(2, depth + 1) - 1) * blockBinCount * Math.sqrt(2);
-        int c1 = avgPosition1 + (int) difference1 / 2 - 1;
-        int c2 = avgPosition2 + (int) difference2 / 2 + 1;
-        int r1 = avgPosition1 - (int) difference2 / 2 - 1;
-        int r2 = avgPosition2 - (int) difference1 / 2 + 1;
-        return new int[]{c1, c2, r1, r2};
-    }
-    
-    public int[] getBlockBoundsFromNumberVersion8Below(int blockNumber) {
-        int c = (blockNumber % blockColumnCount);
-        int r = blockNumber / blockColumnCount;
-        int c1 = c * blockBinCount;
-        int c2 = c1 + blockBinCount - 1;
-        int r1 = r * blockBinCount;
-        int r2 = r1 + blockBinCount - 1;
-        return new int[]{c1, c2, r1, r2};
-    }
-    
     private List<Block> addNormalizedBlocksToListV9(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
                                                     final NormalizationType norm) {
 
@@ -218,8 +243,8 @@ public class MatrixZoomData {
         // Depth is axis perpendicular to diagonal; nearer means closer to diagonal
         int translatedLowerPAD = (binX1 + binY1) / 2 / blockBinCount;
         int translatedHigherPAD = (binX2 + binY2) / 2 / blockBinCount + 1;
-        int translatedNearerDepth = log2(1 + Math.abs(binX1 - binY2) / Math.sqrt(2) / blockBinCount);
-        int translatedFurtherDepth = log2(1 + Math.abs(binX2 - binY1) / Math.sqrt(2) / blockBinCount);
+        int translatedNearerDepth = v9Depth.getDepth(binX1, binY2);
+        int translatedFurtherDepth = v9Depth.getDepth(binX2, binY1);
 
         // because code above assume above diagonal; but we could be below diagonal
         int nearerDepth = Math.min(translatedNearerDepth, translatedFurtherDepth);
@@ -236,10 +261,10 @@ public class MatrixZoomData {
         }
 
         actuallyLoadGivenBlocks(blockList, blocksToLoad, norm);
-        
+
         return new ArrayList<>(new HashSet<>(blockList));
     }
-    
+
     private void populateBlocksToLoad(int r, int c, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
         int blockNumber = r * getBlockColumnCount() + c;
         String key = getBlockKey(blockNumber, no);
@@ -295,7 +320,7 @@ public class MatrixZoomData {
                                                   final NormalizationType no, int chr1, int chr2) {
 
         Set<Integer> blocksToLoad = new HashSet<>();
-    
+
         // for V8 - these will always be ints
         // have to do this regardless (just in case)
         int col1 = binX1 / blockBinCount;
@@ -310,8 +335,8 @@ public class MatrixZoomData {
         }
 
         actuallyLoadGivenBlocks(blockList, blocksToLoad, no, chr1, chr2);
-        System.out.println("I am block size: " + blockList.size());
-        System.out.println("I am first block: " + blockList.get(0).getNumber());
+//        System.out.println("I am block size: " + blockList.size());
+//        System.out.println("I am first block: " + blockList.get(0).getNumber());
         return new ArrayList<>(new HashSet<>(blockList));
     }
 
@@ -435,9 +460,9 @@ public class MatrixZoomData {
 
         System.out.println("Block size (bp): " + blockBinCount * zoom.getBinSize());
         System.out.println();
-    
+
     }
-    
+
     /**
      * For a specified region, select the block numbers corresponding to it
      *
@@ -452,16 +477,16 @@ public class MatrixZoomData {
         }
         return getBlockNumbersForRegionFromBinPosition(regionBinIndices);
     }
-    
+
     // todo V9 needs a diff method
     private List<Integer> getBlockNumbersForRegionFromBinPosition(long[] regionIndices) {
-        
+
         // cast should be fine - this is for V8
         int col1 = (int) (regionIndices[0] / blockBinCount);
         int col2 = (int) ((regionIndices[1] + 1) / blockBinCount);
         int row1 = (int) (regionIndices[2] / blockBinCount);
         int row2 = (int) ((regionIndices[3] + 1) / blockBinCount);
-        
+
         // first check the upper triangular matrix
         Set<Integer> blocksSet = new HashSet<>();
         for (int r = row1; r <= row2; r++) {
@@ -485,18 +510,18 @@ public class MatrixZoomData {
         Collections.sort(blocksToIterateOver);
         return blocksToIterateOver;
     }
-    
-    
+
+
     public void dump(PrintWriter printWriter, LittleEndianOutputStream les, NormalizationType norm, MatrixType matrixType,
                      boolean useRegionIndices, long[] regionIndices, ExpectedValueFunction df, boolean dense) throws IOException {
-        
+
         // determine which output will be used
         if (printWriter == null && les == null) {
             printWriter = new PrintWriter(System.out);
         }
         boolean usePrintWriter = printWriter != null && les == null;
         boolean isIntraChromosomal = chr1.getIndex() == chr2.getIndex();
-        
+
         // Get the block index keys, and sort
         List<Integer> blocksToIterateOver;
         if (useRegionIndices) {
@@ -655,10 +680,10 @@ public class MatrixZoomData {
                         les.writeFloat(matrix[i][j]);
 
                     }
-    
+
                 }
             }
-    
+
             if (usePrintWriter) {
                 printWriter.close();
             } else {
@@ -666,18 +691,18 @@ public class MatrixZoomData {
             }
         }
     }
-    
+
     public void dump1DTrackFromCrossHairAsWig(PrintWriter printWriter, long binStartPosition,
                                               boolean isIntraChromosomal, long[] regionBinIndices,
                                               NormalizationType norm, MatrixType matrixType) {
-        
+
         if (!MatrixType.isObservedOrControl(matrixType)) {
             System.out.println("This feature is only available for Observed or Control views");
             return;
         }
-        
+
         int binCounter = 0;
-        
+
         // Get the block index keys, and sort
         List<Integer> blocksToIterateOver = getBlockNumbersForRegionFromBinPosition(regionBinIndices);
         Collections.sort(blocksToIterateOver);
@@ -746,41 +771,23 @@ public class MatrixZoomData {
         this.averageCount = averageCount;
     }
 
-    public List<List<ContactRecord>> getContactRecordList() {
-        if (localCacheOfRecords == null || localCacheOfRecords.size() < 1) {
-            numberOfContactRecords = 0;
-            localCacheOfRecords = new ArrayList<>(3);
-            List<ContactRecord> currentList = new ArrayList<>(1000000);
-            int localCounter = 0;
-            int maxAllowed = 9 * (Integer.MAX_VALUE / 10);
-            Iterator<ContactRecord> iterator = new ContactRecordIterator(reader, this, blockCache, useCache);
-            while (iterator.hasNext()) {
-                ContactRecord cr = iterator.next();
-                currentList.add(cr);
-                numberOfContactRecords++;
-                localCounter++;
-                if (localCounter > maxAllowed) {
-                    // make new ArrayList
-                    localCacheOfRecords.add(currentList);
-                    localCounter = 0;
-                    currentList = new ArrayList<>();
-                }
-            }
-            if (localCounter > 0) { // add last list
-                localCacheOfRecords.add(currentList);
-            }
-        }
-        return localCacheOfRecords;
-    }
-
     public void clearCache() {
         blockCache.clear();
     }
 
     public long getNumberOfContactRecords() {
-        if (numberOfContactRecords == 0) {
-            getContactRecordList();
+        return getIteratorContainer().getNumberOfContactRecords();
+    }
+
+    private Iterator<ContactRecord> getNewContactRecordIterator() {
+        return getIteratorContainer().getNewContactRecordIterator();
+        //return new ContactRecordIterator(reader, this, blockCache);
+    }
+
+    public IteratorContainer getIteratorContainer() {
+        if (iteratorContainer == null) {
+            iteratorContainer = new IteratorContainer(reader, this, blockCache, useCache);
         }
-        return numberOfContactRecords;
+        return iteratorContainer;
     }
 }

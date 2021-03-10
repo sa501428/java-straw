@@ -25,6 +25,7 @@
 package javastraw.reader;
 
 import javastraw.reader.basics.Block;
+import javastraw.reader.basics.ListOfDoubleArrays;
 import javastraw.type.HiCZoom;
 import javastraw.type.NormalizationType;
 
@@ -52,14 +53,15 @@ public interface DatasetReader {
 
     List<Integer> getBlockNumbers(MatrixZoomData matrixZoomData);
 
-    void close();
-
     NormalizationVector readNormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize) throws IOException;
 
     NormalizationVector readNormalizationVectorPart(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize, int bound1, int bound2) throws IOException;
+
+    ListOfDoubleArrays readExpectedVectorPart(long position, long nVals) throws IOException;
 
     String getPath();
 
     NormalizationVector getNormalizationVector(int chr1Idx, HiCZoom zoom, NormalizationType normalizationType);
 
+    int getDepthBase();
 }

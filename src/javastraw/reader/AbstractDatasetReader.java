@@ -24,8 +24,9 @@
 
 package javastraw.reader;
 
-import javastraw.type.HiCZoom;
-import javastraw.type.NormalizationType;
+import javastraw.reader.norm.NormalizationVector;
+import javastraw.reader.type.HiCZoom;
+import javastraw.reader.type.NormalizationType;
 
 import java.io.IOException;
 

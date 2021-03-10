@@ -22,48 +22,52 @@
  *  THE SOFTWARE.
  */
 
-package javastraw.reader;
 
-import javastraw.reader.block.Block;
+package javastraw.reader.norm;
+
 import javastraw.reader.datastructures.ListOfDoubleArrays;
-import javastraw.reader.mzd.MatrixZoomData;
-import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 
-import java.io.IOException;
-import java.util.List;
 
 /**
  * @author jrobinso
- *         Date: 10/17/12
- *         Time: 8:38 AM
+ *         Date: 2/10/13
+ *         Time: 9:19 AM
  */
-public interface DatasetReader {
+public class NormalizationVector {
 
-    boolean isActive();
+    private final NormalizationType type;
+    private final int chrIdx;
+    private final HiCZoom.HiCUnit unit;
+    private final int resolution;
+    private final ListOfDoubleArrays data;
 
-    void setActive(boolean status);
+    public NormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int resolution, ListOfDoubleArrays data) {
+        this.type = type;
+        this.chrIdx = chrIdx;
+        this.unit = unit;
+        this.resolution = resolution;
+        this.data = data;
+    }
 
-    int getVersion();
+    public static String getKey(NormalizationType type, int chrIdx, String unit, int resolution) {
+        return type + "_" + chrIdx + "_" + unit + "_" + resolution;
+    }
 
-    Dataset read() throws IOException;
+    public int getChrIdx() {
+        return chrIdx;
+    }
 
-    Matrix readMatrix(String key) throws IOException;
+    public int getResolution() {
+        return resolution;
+    }
 
-    Block readNormalizedBlock(int blockNumber, MatrixZoomData zd, NormalizationType no) throws IOException;
-
-    List<Integer> getBlockNumbers(MatrixZoomData matrixZoomData);
-
-    NormalizationVector readNormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize) throws IOException;
-
-    NormalizationVector readNormalizationVectorPart(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize, int bound1, int bound2) throws IOException;
-
-    ListOfDoubleArrays readExpectedVectorPart(long position, long nVals) throws IOException;
-
-    String getPath();
-
-    NormalizationVector getNormalizationVector(int chr1Idx, HiCZoom zoom, NormalizationType normalizationType);
-
-    int getDepthBase();
+    public String getKey() {
+        return NormalizationVector.getKey(type, chrIdx, unit.toString(), resolution);
+    }
+    
+    public ListOfDoubleArrays getData() {
+        return data;
+    }
 }

@@ -26,9 +26,13 @@ package javastraw.reader;
 
 import com.google.common.primitives.Ints;
 import javastraw.reader.basics.Chromosome;
-import javastraw.type.HiCZoom;
-import javastraw.type.NormalizationHandler;
-import javastraw.type.NormalizationType;
+import javastraw.reader.basics.ChromosomeHandler;
+import javastraw.reader.expected.ExpectedValueFunction;
+import javastraw.reader.expected.ExpectedValueFunctionImpl;
+import javastraw.reader.norm.NormalizationVector;
+import javastraw.reader.type.HiCZoom;
+import javastraw.reader.type.NormalizationHandler;
+import javastraw.reader.type.NormalizationType;
 import org.broad.igv.util.FileUtils;
 import org.broad.igv.util.Pair;
 import org.broad.igv.util.ResourceLocator;

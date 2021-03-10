@@ -24,7 +24,7 @@
 
 package javastraw.tools;
 
-import javastraw.reader.basics.ContactRecord;
+import javastraw.reader.block.ContactRecord;
 import org.apache.commons.math.linear.Array2DRowRealMatrix;
 import org.apache.commons.math.linear.RealMatrix;
 import org.apache.commons.math3.stat.descriptive.rank.Median;

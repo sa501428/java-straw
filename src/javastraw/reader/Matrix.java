@@ -26,7 +26,9 @@
 package javastraw.reader;
 
 import javastraw.reader.basics.Chromosome;
-import javastraw.type.HiCZoom;
+import javastraw.reader.mzd.DynamicMatrixZoomData;
+import javastraw.reader.mzd.MatrixZoomData;
+import javastraw.reader.type.HiCZoom;
 import org.broad.igv.util.Pair;
 
 import java.util.*;

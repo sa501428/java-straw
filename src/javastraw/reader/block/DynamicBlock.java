@@ -22,21 +22,27 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.reader.block;
 
-/**
- * @author Muhammad Shamim
- * @since 11/25/14
- */
-public class HiCGlobals {
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-    public static final String versionNum = "1.02.03";
+public class DynamicBlock extends Block {
+    Set<ContactRecord> recordSet = new HashSet<>();
 
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
+    public DynamicBlock(int number, ContactRecord record, String regionID) {
+        super(number, null, regionID);
+        recordSet.add(record);
+    }
 
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+    @Override
+    public List<ContactRecord> getContactRecords() {
+        return new ArrayList<>(recordSet);
+    }
+
+    public void addContactRecord(ContactRecord cr) {
+        recordSet.add(cr);
+    }
 }

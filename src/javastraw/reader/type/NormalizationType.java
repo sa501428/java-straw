@@ -22,21 +22,50 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.reader.type;
+
+
+import java.util.Objects;
 
 /**
- * @author Muhammad Shamim
- * @since 11/25/14
+ * @author jrobinso Date: 8/31/13  9:47 PM
  */
-public class HiCGlobals {
+public class NormalizationType {
+	//LOADED("Loaded");
+	private final String label;
+	private final String description;
+	
+	public NormalizationType(String label, String description) {
+        this.label = label.toUpperCase();
+        this.description = description;
+    }
 
-    public static final String versionNum = "1.02.03";
+    public String getLabel() {
+        return label;
+    }
 
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
+    public String getDescription() {
+        return description;
+    }
 
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+    @Override
+    public String toString() {
+        return label;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        if (this == obj) {
+            return true;
+        } else if (obj instanceof NormalizationType) {
+            NormalizationType norm2 = (NormalizationType) obj;
+            return label.equalsIgnoreCase(norm2.getLabel());
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+		return Objects.hash(label.hashCode(), description.hashCode());
+    }
 }

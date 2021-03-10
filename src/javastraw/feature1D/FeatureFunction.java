@@ -22,21 +22,13 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.feature1D;
+
+import java.util.List;
 
 /**
- * @author Muhammad Shamim
- * @since 11/25/14
+ * Created by muhammadsaadshamim on 7/30/15.
  */
-public class HiCGlobals {
-
-    public static final String versionNum = "1.02.03";
-
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
-
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+public interface FeatureFunction<T> {
+    void process(String chr, List<T> featureList);
 }

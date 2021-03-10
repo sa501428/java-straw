@@ -22,21 +22,39 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.reader.block;
 
-/**
- * @author Muhammad Shamim
- * @since 11/25/14
- */
-public class HiCGlobals {
+import htsjdk.tribble.util.LittleEndianInputStream;
 
-    public static final String versionNum = "1.02.03";
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
+public class BlockIndex {
+    protected final Map<Integer, IndexEntry> blockIndex;
+    protected final int numBlocks;
 
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+    public BlockIndex(int nBlocks) {
+        numBlocks = nBlocks;
+        blockIndex = new HashMap<>(nBlocks);
+    }
+
+    public void populateBlocks(LittleEndianInputStream dis) throws IOException {
+        for (int b = 0; b < numBlocks; b++) {
+            int blockNumber = dis.readInt();
+            long filePosition = dis.readLong();
+            int blockSizeInBytes = dis.readInt();
+            blockIndex.put(blockNumber, new IndexEntry(filePosition, blockSizeInBytes));
+        }
+    }
+
+    public List<Integer> getBlockNumbers() {
+        return new ArrayList<>(blockIndex.keySet());
+    }
+
+    public IndexEntry getBlock(int blockNumber) {
+        return blockIndex.get(blockNumber);
+    }
 }

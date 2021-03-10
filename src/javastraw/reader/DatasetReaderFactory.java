@@ -58,7 +58,7 @@ public class DatasetReaderFactory {
         return null;
     }
 
-    static String getMagicString(String path) throws IOException {
+    public static String getMagicString(String path) throws IOException {
 
         SeekableStream stream = null;
         LittleEndianInputStream dis = null;

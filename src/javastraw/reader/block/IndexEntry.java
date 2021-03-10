@@ -22,21 +22,21 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.reader.block;
 
-/**
- * @author Muhammad Shamim
- * @since 11/25/14
- */
-public class HiCGlobals {
+public class IndexEntry {
+    public final long position;
+    public final int size;
+    int id;
 
-    public static final String versionNum = "1.02.03";
+    IndexEntry(int id, long position, int size) {
+        this.id = id;
+        this.position = position;
+        this.size = size;
+    }
 
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
-
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+    public IndexEntry(long position, int size) {
+        this.position = position;
+        this.size = size;
+    }
 }

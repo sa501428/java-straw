@@ -189,7 +189,7 @@ public class HiCFileTools {
                 System.err.println("Chromosome " + strKey + " not found");
             }
         }
-        return new ChromosomeHandler(chromosomes, handler.getGenomeID(), false);
+        return new ChromosomeHandler(chromosomes, handler.getGenomeID(), true);
     }
 
     /**

@@ -155,8 +155,8 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
                 chromosomes.add(new Chromosome(i, name, size));
             }
-            boolean createWholeChr = false;
-            ChromosomeHandler chromosomeHandler = new ChromosomeHandler(chromosomes, genomeId, createWholeChr);
+
+            ChromosomeHandler chromosomeHandler = new ChromosomeHandler(chromosomes, genomeId, false);
 
             dataset.setChromosomeHandler(chromosomeHandler);
             // guess genomeID from chromosomes

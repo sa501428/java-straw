@@ -47,12 +47,12 @@ public class ChromosomeHandler {
         this(chromosomes, genomeID, true);
     }
 
-    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean createAllChr) {
+    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean setAllChr) {
 
         this.genomeID = genomeID;
 
         // set the global chromosome list
-        if (createAllChr) {
+        if (setAllChr) {
             long genomeLength = getTotalLengthOfAllChromosomes(chromosomes);
             chromosomes.set(0, new Chromosome(0, cleanUpName(CHR_ALL), (int) (genomeLength / 1000)));
         }
@@ -138,9 +138,11 @@ public class ChromosomeHandler {
     private List<Chromosome> initializeCleanedChromosomesList(List<Chromosome> chromosomes) {
         List<Chromosome> cleanedChromosomes = new ArrayList<>();
         for (Chromosome c : chromosomes) {
-            String cleanName = cleanUpName(c.getName());
-            Chromosome cleanChromosome = new Chromosome(c.getIndex(), cleanName, c.getLength());
-            cleanedChromosomes.add(cleanChromosome);
+            if (c != null) {
+                String cleanName = cleanUpName(c.getName());
+                Chromosome cleanChromosome = new Chromosome(c.getIndex(), cleanName, c.getLength());
+                cleanedChromosomes.add(cleanChromosome);
+            }
         }
         return cleanedChromosomes;
     }

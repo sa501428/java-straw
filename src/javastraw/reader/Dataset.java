@@ -233,9 +233,16 @@ public class Dataset {
         }
     }
 
-
     public List<NormalizationType> getNormalizationTypes() {
         return normalizationTypes;
+    }
+
+    public Map<String, NormalizationType> getNormalizationTypesMap() {
+        Map<String, NormalizationType> normsForDatasetMap = new HashMap<>();
+        for (NormalizationType nType : normalizationTypes) {
+            normsForDatasetMap.put(nType.getLabel(), nType);
+        }
+        return normsForDatasetMap;
     }
 
     public void setNormalizationTypes(List<NormalizationType> normalizationTypes) {

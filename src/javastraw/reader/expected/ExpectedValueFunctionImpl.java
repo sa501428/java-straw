@@ -34,10 +34,6 @@ import java.util.Map;
 
 /**
  * Utility holder for Density calculation, for O/E maps.
- *
- * @author Jim Robinson
- * @author Neva Cherniavsky
- * @since 8/27/12
  */
 public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 

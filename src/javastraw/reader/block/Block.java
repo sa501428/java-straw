@@ -30,11 +30,6 @@ package javastraw.reader.block;
 import java.util.ArrayList;
 import java.util.List;
 
-
-/**
- * @author jrobinso
- * @since Aug 10, 2010
- */
 public class Block {
 
     private final int number;

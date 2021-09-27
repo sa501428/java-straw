@@ -29,12 +29,6 @@ import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 
-
-/**
- * @author jrobinso
- *         Date: 2/10/13
- *         Time: 9:19 AM
- */
 public class NormalizationVector {
 
     private final NormalizationType type;

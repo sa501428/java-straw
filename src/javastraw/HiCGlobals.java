@@ -24,13 +24,9 @@
 
 package javastraw;
 
-/**
- * @author Muhammad Shamim
- * @since 11/25/14
- */
 public class HiCGlobals {
 
-    public static final String versionNum = "1.04.01";
+    public static final String versionNum = "1.04.02";
 
     // min hic file version supported
     public static final int minVersion = 6;

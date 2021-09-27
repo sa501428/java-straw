@@ -27,9 +27,6 @@ package javastraw.reader.type;
 
 import java.util.Objects;
 
-/**
- * @author jrobinso Date: 8/31/13  9:47 PM
- */
 public class NormalizationType {
 	//LOADED("Loaded");
 	private final String label;

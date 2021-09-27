@@ -48,12 +48,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
-
-/**
- * @author jrobinso
- * @since Aug 10, 2010
- */
 public class MatrixZoomData {
 
     final Chromosome chr1;  // Chromosome on the X axis

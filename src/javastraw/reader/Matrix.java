@@ -33,10 +33,6 @@ import org.broad.igv.util.Pair;
 
 import java.util.*;
 
-/**
- * @author jrobinso
- * @since Aug 12, 2010
- */
 public class Matrix {
 
     private final int chr1;

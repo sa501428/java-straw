@@ -39,7 +39,6 @@ import java.util.concurrent.Executors;
  * List of two-dimensional features.  Hashtable for each chromosome for quick viewing.
  * Visibility depends on user selection.
  *
- * @author Neva Durand, Muhammad Shamim, Marie Hoeger
  * <p/>
  * TODO cleanup code and eliminate this class
  * It should become GenomeWideList<Feature2D>

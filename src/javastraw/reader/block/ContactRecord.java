@@ -28,10 +28,6 @@ import javastraw.reader.type.NormalizationType;
 
 import java.util.Objects;
 
-/**
- * @author jrobinso
- * @since Aug 3, 2010
- */
 public class ContactRecord implements Comparable<ContactRecord> {
     
     /**

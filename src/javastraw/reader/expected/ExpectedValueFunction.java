@@ -28,11 +28,6 @@ import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 
-/**
- * @author jrobinso
- *         Date: 12/26/12
- *         Time: 9:30 PM
- */
 public interface ExpectedValueFunction {
 
     double getExpectedValue(int chrIdx, long distance);

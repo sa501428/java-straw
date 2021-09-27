@@ -35,11 +35,6 @@ import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.URL;
 
-/**
- * @author jrobinso
- *         Date: 12/22/12
- *         Time: 1:06 PM
- */
 public class DatasetReaderFactory {
 
     public static DatasetReaderV2 getReaderForFile(String file, boolean useCache) throws IOException {

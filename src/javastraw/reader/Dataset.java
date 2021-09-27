@@ -41,10 +41,6 @@ import org.broad.igv.util.collections.LRUCache;
 import java.io.IOException;
 import java.util.*;
 
-/**
- * @author jrobinso
- * @since Aug 12, 2010
- */
 public class Dataset {
 
     private static final String V9_DEPTH_BASE = "v9-depth-base";

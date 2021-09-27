@@ -27,11 +27,6 @@ package javastraw.reader.type;
 
 import java.util.Objects;
 
-/**
- * @author jrobinso
- * Date: 12/17/12
- * Time: 9:16 AM
- */
 public class HiCZoom implements Comparable<HiCZoom> {
 
     private final HiCUnit unit;

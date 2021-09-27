@@ -34,11 +34,6 @@ import javastraw.reader.type.NormalizationType;
 import java.io.IOException;
 import java.util.List;
 
-/**
- * @author jrobinso
- *         Date: 10/17/12
- *         Time: 8:38 AM
- */
 public interface DatasetReader {
 
     boolean isActive();

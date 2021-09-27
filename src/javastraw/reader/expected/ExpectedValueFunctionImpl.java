@@ -50,7 +50,8 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 	private long streamBound1 = 0;
 	private long streamBound2 = 0;
 
-	public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize, ListOfDoubleArrays expectedValues, Map<Integer, Double> normFactors) {
+	public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize,
+									 ListOfDoubleArrays expectedValues, Map<Integer, Double> normFactors) {
 		this.type = type;
 		this.unit = unit;
 		this.binSize = binSize;
@@ -61,7 +62,8 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 		this.reader = null;
 	}
 
-	public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize, long nValues, long filePosition, Map<Integer, Double> normFactors, DatasetReader reader) {
+	public ExpectedValueFunctionImpl(NormalizationType type, HiCZoom.HiCUnit unit, int binSize, long nValues,
+									 long filePosition, Map<Integer, Double> normFactors, DatasetReader reader) {
 		this.type = type;
 		this.unit = unit;
 		this.binSize = binSize;
@@ -82,7 +84,6 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 		return normFactors;
 	}
 
-
 	/**
 	 * Expected value vector.  No chromosome normalization
 	 *
@@ -90,6 +91,11 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 	 */
 	@Override
 	public ListOfDoubleArrays getExpectedValuesNoNormalization() {
+		streamExpectedVectorFromFileIfNeeded();
+		return expectedValues;
+	}
+
+	private void streamExpectedVectorFromFileIfNeeded() {
 		if (expectedValues == null && (streamBound1 == 0 && streamBound2 == 0)) {
 			try {
 				expectedValues = reader.readExpectedVectorPart(filePosition, nValues);
@@ -100,7 +106,6 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 				e.printStackTrace();
 			}
 		}
-		return expectedValues;
 	}
 
 	/**
@@ -118,15 +123,7 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 			normFactor = normFactors.get(chrIdx);
 		}
 		if (expectedValues == null) {
-			streamBound1 = Math.max(0, distance - (streamSize / 2));
-			streamBound2 = streamBound1 + streamSize;
-			long position = version > 8 ? filePosition + (streamBound1 * 4) : filePosition + (streamBound1 * 8);
-			try {
-				expectedValues = reader.readExpectedVectorPart(position, streamSize);
-			} catch (IOException e) {
-				System.err.println("Error reading expected vector");
-				e.printStackTrace();
-			}
+			streamPortionOfExpectedVector(distance);
 		}
 
 		if (streamBound1 == 0 && streamBound2 == 0) {
@@ -144,32 +141,27 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 			streamIndex = distance - streamBound1;
 			return expectedValues.get(streamIndex) / normFactor;
 		} else {
-			streamBound1 = Math.max(0, distance - (streamSize / 2));
-			streamBound2 = streamBound1 + streamSize;
-			long position = version > 8 ? filePosition + (streamBound1 * 4) : filePosition + (streamBound1 * 8);
-			try {
-				expectedValues = reader.readExpectedVectorPart(position, streamSize);
-			} catch (IOException e) {
-				System.err.println("Error reading expected vector");
-				e.printStackTrace();
-			}
+			streamPortionOfExpectedVector(distance);
 			streamIndex = distance - streamBound1;
 			return expectedValues.get(streamIndex) / normFactor;
 		}
 	}
 
+	private void streamPortionOfExpectedVector(long distance) {
+		streamBound1 = Math.max(0, distance - (streamSize / 2));
+		streamBound2 = streamBound1 + streamSize;
+		long position = version > 8 ? filePosition + (streamBound1 * 4) : filePosition + (streamBound1 * 8);
+		try {
+			expectedValues = reader.readExpectedVectorPart(position, streamSize);
+		} catch (IOException e) {
+			System.err.println("Error reading expected vector");
+			e.printStackTrace();
+		}
+	}
+
 	@Override
 	public ListOfDoubleArrays getExpectedValuesWithNormalization(int chrIdx) {
-		if (expectedValues == null && (streamBound1 == 0 && streamBound2 == 0)) {
-			try {
-				expectedValues = reader.readExpectedVectorPart(filePosition, nValues);
-				streamBound1 = 0;
-				streamBound2 = 0;
-			} catch (IOException e) {
-				System.err.println("Error reading expected vector");
-				e.printStackTrace();
-			}
-		}
+		streamExpectedVectorFromFileIfNeeded();
 		double normFactor = 1.0;
 		if (normFactors != null && normFactors.containsKey(chrIdx)) {
 			normFactor = normFactors.get(chrIdx);
@@ -203,6 +195,11 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 	@Override
 	public int getBinSize() {
 		return binSize;
+	}
+
+	public ExpectedValueFunction generateCleanedVersion() {
+		return new ExpectedValueFunctionImpl(type, unit, binSize,
+				ExpectedUtils.smooth(getExpectedValuesNoNormalization()), normFactors);
 	}
 
 }

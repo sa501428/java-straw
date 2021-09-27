@@ -49,7 +49,8 @@ public class Dataset {
     private final LRUCache<String, double[]> eigenvectorCache;
     private final LRUCache<String, NormalizationVector> normalizationVectorCache;
     private final Map<String, NormalizationVector> normalizationsVectorsOnlySavedInRAMCache;
-    Map<String, ExpectedValueFunction> expectedValueFunctionMap;
+    private final Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap = new HashMap<>();
+    private Map<String, ExpectedValueFunction> expectedValueFunctionMap;
     String genomeId;
     String restrictionEnzyme = null;
     List<HiCZoom> bpZooms, dynamicZooms, fragZooms;
@@ -272,14 +273,31 @@ public class Dataset {
         return null;
     }
 
-    public ExpectedValueFunction getExpectedValues(HiCZoom zoom, NormalizationType type) {
-        if (expectedValueFunctionMap == null || zoom == null || type == null) return null;
+    public ExpectedValueFunction getExpectedValues(HiCZoom zoom, NormalizationType type, boolean getCorrectedVersion) {
+        Map<String, ExpectedValueFunction> map = expectedValueFunctionMap;
+
+        if (map == null || zoom == null || type == null) return null;
         String key = ExpectedValueFunctionImpl.getKey(zoom, type);
-        return expectedValueFunctionMap.get(key);
+        if (getCorrectedVersion) {
+            return getCorrectedVersionOfExpectedVector(key);
+        }
+        return map.get(key);
     }
 
-    public ExpectedValueFunction getExpectedValuesOrExit(HiCZoom zoom, NormalizationType type, Chromosome chromosome, boolean isIntra) {
-        ExpectedValueFunction df = getExpectedValues(zoom, type);
+    private ExpectedValueFunction getCorrectedVersionOfExpectedVector(String key) {
+        if (!correctedExpectedValueFunctionMap.containsKey(key)) {
+            ExpectedValueFunction corrected = expectedValueFunctionMap.get(key);
+            if (corrected != null) {
+                corrected = corrected.generateCleanedVersion();
+            }
+            correctedExpectedValueFunctionMap.put(key, corrected);
+        }
+        return correctedExpectedValueFunctionMap.get(key);
+    }
+
+    public ExpectedValueFunction getExpectedValuesOrExit(HiCZoom zoom, NormalizationType type, Chromosome chromosome,
+                                                         boolean isIntra, boolean getCorrectedVersion) {
+        ExpectedValueFunction df = getExpectedValues(zoom, type, getCorrectedVersion);
         if (isIntra && df == null) {
             System.err.println("O/E data not available at " + chromosome.getName() + " " + zoom + " " + type);
             System.exit(14);

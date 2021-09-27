@@ -39,10 +39,6 @@ import java.util.Map;
 
 /**
  * Utility functions to dump various bits of a hic file to stdout or file(s)
- *
- * @author jrobinso
- *         Date: 2/11/13
- *         Time: 2:01 PM
  */
 
 class HiCFileUtils {

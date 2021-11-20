@@ -30,8 +30,6 @@ import java.util.*;
 
 
 /**
- * @author jrobinso, mshamim, mhoeger
- * <p/>
  * reflection only used for plotting, should not be used by CLTs
  */
 public class Feature2D implements Comparable<Feature2D> {

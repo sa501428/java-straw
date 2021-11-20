@@ -352,11 +352,12 @@ public class HiCFileTools {
 
         return blocks;
     }
-    
-    public static ListOfDoubleArrays extractChromosomeExpectedVector(Dataset ds, int index, HiCZoom zoom, NormalizationType normalization) {
-        ExpectedValueFunction expectedValueFunction = ds.getExpectedValues(zoom, normalization);
+
+    public static ListOfDoubleArrays extractChromosomeExpectedVector(Dataset ds, int index, HiCZoom zoom,
+                                                                     NormalizationType normalization, boolean getCorrectedVersion) {
+        ExpectedValueFunction expectedValueFunction = ds.getExpectedValues(zoom, normalization, getCorrectedVersion);
         long n = expectedValueFunction.getLength();
-        
+
         ListOfDoubleArrays expectedVector = new ListOfDoubleArrays(n);
         for (long i = 0; i < n; i++) {
             expectedVector.set(i, expectedValueFunction.getExpectedValue(index, i));
@@ -419,13 +420,14 @@ public class HiCFileTools {
 
     public static float[][] getOEMatrixForChromosome(Dataset ds, Chromosome chromosome, int resolution, NormalizationType norm,
                                                      double logThreshold, ExtractingOEDataUtils.ThresholdType thresholdType,
-                                                     boolean fillUnderDiagonal, float pseudocount, float invalidReplacement) throws IOException {
+                                                     boolean fillUnderDiagonal, float pseudocount, float invalidReplacement,
+                                                     boolean getCorrectedVersion) throws IOException {
 
         final MatrixZoomData zd = getMatrixZoomData(ds, chromosome, chromosome, resolution);
         if (zd == null) return null;
 
         return getOEMatrixForChromosome(ds, zd, chromosome, resolution, norm, logThreshold, thresholdType, fillUnderDiagonal,
-                pseudocount, invalidReplacement);
+                pseudocount, invalidReplacement, getCorrectedVersion);
 
     }
 
@@ -433,9 +435,9 @@ public class HiCFileTools {
                                                      int resolution, NormalizationType norm, double logThreshold,
                                                      ExtractingOEDataUtils.ThresholdType thresholdType,
                                                      boolean fillUnderDiagonal, float pseudocount,
-                                                     float invalidReplacement) throws IOException {
+                                                     float invalidReplacement, boolean getCorrectedVersion) throws IOException {
 
-        ExpectedValueFunction df = ds.getExpectedValuesOrExit(zd.getZoom(), norm, chromosome, true);
+        ExpectedValueFunction df = ds.getExpectedValuesOrExit(zd.getZoom(), norm, chromosome, true, getCorrectedVersion);
 
         int maxBin = (int) (chromosome.getLength() / resolution + 1);
 

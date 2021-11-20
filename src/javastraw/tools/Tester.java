@@ -3,6 +3,13 @@ package javastraw.tools;
 public class Tester {
 
     public static void main(String[] args) {
+
+        /*
+        float[][] temp = new float[5][6];
+        String outpath = "/Users/mshamim/Desktop/temp.npy";
+        MatrixTools.saveMatrixTextNumpy(outpath, temp);
+        System.exit(0);
+
         /*
         Dataset ds = HiCFileTools.extractDatasetForCLT("/Users/mshamim/Desktop/hicfiles/gm12878_rh14_30.hic",
                 true, false);

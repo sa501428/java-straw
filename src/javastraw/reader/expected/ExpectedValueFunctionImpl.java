@@ -196,10 +196,4 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 	public int getBinSize() {
 		return binSize;
 	}
-
-	public ExpectedValueFunction generateCleanedVersion() {
-		return new ExpectedValueFunctionImpl(type, unit, binSize,
-				ExpectedUtils.smooth(getExpectedValuesNoNormalization()), normFactors);
-	}
-
 }

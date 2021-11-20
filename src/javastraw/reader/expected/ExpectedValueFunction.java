@@ -43,6 +43,4 @@ public interface ExpectedValueFunction {
     ListOfDoubleArrays getExpectedValuesNoNormalization();
 
     ListOfDoubleArrays getExpectedValuesWithNormalization(int chrIdx);
-
-    ExpectedValueFunction generateCleanedVersion();
 }

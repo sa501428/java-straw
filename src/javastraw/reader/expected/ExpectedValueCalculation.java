@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2011-2021 Broad Institute, Aiden Lab, Rice University, Baylor College of Medicine
+ * Copyright (c) 2011-2021 Rice University, Baylor College of Medicine
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -25,17 +25,16 @@
 
 package javastraw.reader.expected;
 
-
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.block.ContactRecord;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
-import javastraw.reader.datastructures.ListOfFloatArrays;
-import javastraw.reader.iterators.IteratorContainer;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Computes an "expected" density vector.  Essentially there are 3 steps to using this class
@@ -68,8 +67,8 @@ public class ExpectedValueCalculation {
     /**
      * Genome wide count of binned reads at a given distance
      */
-    private final List<List<Double>> actualDistances;
-    /**
+    private final double[] actualDistances;
+    /*
      * Chromosome in this genome, needed for normalizations
      */
     private final Chromosome[] chromosomesMap;
@@ -77,8 +76,6 @@ public class ExpectedValueCalculation {
      * Expected count at a given binned distance from diagonal
      */
     private ListOfDoubleArrays densityAvg;
-
-    private int indexWhereSparsityStarts;
 
     /**
      * Instantiate a DensityCalculation.  This constructor is used to compute the "expected" density from pair data.
@@ -91,7 +88,6 @@ public class ExpectedValueCalculation {
 
         this.type = type;
         this.binSize = binSize;
-        this.indexWhereSparsityStarts = 100000000 / binSize;
         long maxLen = 0;
 
         int maxNumChromosomes = chromosomeHandler.getMaxChromIndex() + 1;
@@ -103,41 +99,17 @@ public class ExpectedValueCalculation {
         for (Chromosome chromosome : chromosomeHandler.getChromosomeArrayWithoutAllByAll()) {
             if (chromosome != null) {
                 chromosomesMap[chromosome.getIndex()] = chromosome;
-                try {
-                    maxLen = Math.max(maxLen, chromosome.getLength());
-                } catch (NullPointerException error) {
-                    System.err.println("Problem with creating fragment-delimited maps, NullPointerException.\n" +
-                            "This could be due to a null fragment map or to a mismatch in the chromosome name in " +
-                            "the fragment map vis-a-vis the input file or chrom.sizes file.\n" +
-                            "Exiting.");
-                    System.exit(63);
-                } catch (ArrayIndexOutOfBoundsException error) {
-                    System.err.println("Problem with creating fragment-delimited maps, ArrayIndexOutOfBoundsException.\n" +
-                            "This could be due to a null fragment map or to a mismatch in the chromosome name in " +
-                            "the fragment map vis-a-vis the input file or chrom.sizes file.\n" +
-                            "Exiting.");
-                    System.exit(22);
-                }
+                maxLen = Math.max(maxLen, chromosome.getLength());
             }
         }
 
         numberOfBins = (int) (maxLen / binSize) + 1;
-        actualDistances = new ArrayList<List<Double>>(numberOfBins);
-        for (int z = 0; z < numberOfBins; z++) {
-            actualDistances.add(new ArrayList<>());
-        }
+        actualDistances = new double[numberOfBins];
+        Arrays.fill(actualDistances, 0);
     }
 
     public static boolean isValidNormValue(float v) {
         return !Float.isNaN(v) && v > 0;
-    }
-
-    public int getBinSize() {
-        return binSize;
-    }
-
-    public void addDistance(int chrIdx, ContactRecord cr) {
-        addDistance(chrIdx, cr.getBinX(), cr.getBinY(), cr.getCounts());
     }
 
     /**
@@ -149,32 +121,12 @@ public class ExpectedValueCalculation {
      */
     public synchronized void addDistance(int chrIdx, int bin1, int bin2, double weight) {
 
-        // Ignore NaN values
         if (Double.isNaN(weight)) return;
         if (chromosomesMap[chrIdx] == null) return;
 
         chromosomeCounts[chrIdx] += weight;
         int dist = Math.abs(bin1 - bin2);
-        actualDistances.get(dist).add(weight);
-    }
-
-    public void merge(ExpectedValueCalculation otherEVCalc) {
-        for (int z = 0; z < chromosomeCounts.length; z++) {
-            chromosomeCounts[z] += otherEVCalc.chromosomeCounts[z];
-        }
-
-        for (int i = 0; i < actualDistances.size(); i++) {
-            if (otherEVCalc.actualDistances.get(i).size() > 0) {
-                actualDistances.get(i).addAll(otherEVCalc.actualDistances.get(i));
-            }
-        }
-    }
-
-    public boolean hasData() {
-        for (double val : chromosomeCounts) {
-            if (val > 0) return true;
-        }
-        return false;
+        actualDistances[dist] += weight;
     }
 
     /**
@@ -191,7 +143,7 @@ public class ExpectedValueCalculation {
         long maxNumBins = 0;
 
         //System.err.println("# of bins=" + numberOfBins);
-        /**
+        /*
          * Genome wide binned possible distances
          */
         double[] possibleDistances = new double[numberOfBins];
@@ -220,33 +172,42 @@ public class ExpectedValueCalculation {
 
         // Smoothing.  Keep pointers to window size.  When read counts drops below 400 (= 5% shot noise), smooth
 
-        ListOfDoubleArrays numEntriesForDist = new ListOfDoubleArrays(maxNumBins);
-        for (int q = 0; q < maxNumBins; q++) {
-            List<Double> values = new ArrayList<>(actualDistances.get(q));
-            if (values.size() < MIN_VALS_NEEDED && q < indexWhereSparsityStarts) {
-                indexWhereSparsityStarts = q;
-            }
-
-            int window = 0;
-            while (values.size() < MIN_VALS_NEEDED) {
-                window++;
-                if (q - window > -1) {
-                    values.addAll(actualDistances.get(q - window));
+        double numSum = actualDistances[0];
+        double denSum = possibleDistances[0];
+        int bound1 = 0;
+        int bound2 = 0;
+        for (long ii = 0; ii < maxNumBins; ii++) {
+            if (numSum < MIN_VALS_NEEDED) {
+                while (numSum < MIN_VALS_NEEDED && bound2 < maxNumBins) {
+                    // increase window size until window is big enough.  This code will only execute once;
+                    // after this, the window will always contain at least 400 reads.
+                    bound2++;
+                    numSum += actualDistances[bound2];
+                    denSum += possibleDistances[bound2];
                 }
-                if (q + window < actualDistances.size()) {
-                    values.addAll(actualDistances.get(q + window));
+            } else if (numSum >= MIN_VALS_NEEDED && bound2 - bound1 > 0) {
+                while (bound2 - bound1 > 0 && bound2 < numberOfBins && bound1 < numberOfBins && numSum - actualDistances[bound1] - actualDistances[bound2] >= MIN_VALS_NEEDED) {
+                    numSum = numSum - actualDistances[bound1] - actualDistances[bound2];
+                    denSum = denSum - possibleDistances[bound1] - possibleDistances[bound2];
+                    bound1++;
+                    bound2--;
                 }
             }
-
-            numEntriesForDist.set(q, values.size());
-            densityAvg.set(q, QuickMedian.fastMedian(values));
+            densityAvg.set(ii, numSum / denSum);
+            // Default case - bump the window size up by 2 to keep it centered for the next iteration
+            if (bound2 + 2 < maxNumBins) {
+                numSum += actualDistances[bound2 + 1] + actualDistances[bound2 + 2];
+                denSum += possibleDistances[bound2 + 1] + possibleDistances[bound2 + 2];
+                bound2 += 2;
+            } else if (bound2 + 1 < maxNumBins) {
+                numSum += actualDistances[bound2 + 1];
+                denSum += possibleDistances[bound2 + 1];
+                bound2++;
+            }
+            // Otherwise, bound2 is at limit already
         }
-        actualDistances.clear();
-        // previously mean window 400
-        // now median window, 400
 
-        // rolling mean from 1st sparse index
-        densityAvg.doRollingMeanFromIndex(indexWhereSparsityStarts, 100);
+        densityAvg.doRollingMedian(100);
 
         // Compute fudge factors for each chromosome so the total "expected" count for that chromosome == the observed
 
@@ -288,15 +249,6 @@ public class ExpectedValueCalculation {
     }
 
     /**
-     * Accessor for the densities
-     *
-     * @return The densities
-     */
-    public ListOfDoubleArrays getDensityAvg() {
-        return densityAvg;
-    }
-
-    /**
      * Accessor for the normalization type
      *
      * @return The normalization type
@@ -311,20 +263,9 @@ public class ExpectedValueCalculation {
                 binSize, densityAvg, getChrScaleFactors());
     }
 
-    // TODO: this is often inefficient, we have all of the contact records when we leave norm calculations, should do this there if possible
-    public void addDistancesFromIterator(int chrIndx, IteratorContainer ic, ListOfFloatArrays vector) {
-        Iterator<ContactRecord> iterator = ic.getNewContactRecordIterator();
-        while (iterator.hasNext()) {
-            ContactRecord cr = iterator.next();
-            int x = cr.getBinX();
-            int y = cr.getBinY();
-            final float counts = cr.getCounts();
-            float xVal = vector.get(x);
-            float yVal = vector.get(y);
-            if (isValidNormValue(xVal) & isValidNormValue(yVal)) {
-                double value = counts / (xVal * yVal);
-                addDistance(chrIndx, x, y, value);
-            }
+    public void addDistance(int chrIdx, ContactRecord cr) {
+        if (isValidNormValue(cr.getCounts())) {
+            addDistance(chrIdx, cr.getBinX(), cr.getBinY(), cr.getCounts());
         }
     }
 }

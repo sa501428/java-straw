@@ -16,7 +16,7 @@ public class MedianExpectedVector {
     public static ExpectedValueFunction generateVector(Dataset dataset, HiCZoom zoom, NormalizationType type) {
 
         ChromosomeHandler handler = dataset.getChromosomeHandler();
-        OldExpectedValueCalculation ev = new OldExpectedValueCalculation(handler, zoom.getBinSize(), type);
+        ExpectedValueCalculation ev = new ExpectedValueCalculation(handler, zoom.getBinSize(), type);
 
         // Loop through chromosomes
         for (Chromosome chr : handler.getChromosomeArrayWithoutAllByAll()) {
@@ -40,6 +40,5 @@ public class MedianExpectedVector {
             zd.clearCache();
         }
         return ev.getExpectedValueFunction();
-
     }
 }

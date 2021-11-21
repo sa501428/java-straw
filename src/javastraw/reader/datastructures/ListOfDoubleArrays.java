@@ -215,19 +215,25 @@ public class ListOfDoubleArrays {
 		if (window >= data.length) return;
 
 		double[] secondArray = new double[data.length - window];
+		List<Double> values = getInitialList(window, data);
 		for (int z = 0; z < secondArray.length; z++) {
-			secondArray[z] = getSafeMedian(data, z, z + window + window);
+			secondArray[z] = QuickMedian.fastMedian(values);
+			values.remove(0);
+			int nextIndexToAdd = 2 * (window + 1) + z;
+			if (nextIndexToAdd < data.length) {
+				values.add(data[nextIndexToAdd]);
+			}
 		}
 		System.arraycopy(secondArray, 0, data, window, secondArray.length);
 	}
 
-	private double getSafeMedian(double[] data, int potentialStart, int potentialEnd) {
-		int start = Math.max(0, potentialStart);
-		int end = Math.min(data.length, potentialEnd);
+	private List<Double> getInitialList(int window, double[] data) {
+		int start = 0;
+		int end = 2 * (window + 1);
 		List<Double> values = new ArrayList<>();
 		for (int q = start; q < end; q++) {
 			values.add(data[q]);
 		}
-		return QuickMedian.fastMedian(values);
+		return values;
 	}
 }

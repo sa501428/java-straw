@@ -29,7 +29,6 @@ import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.expected.ExpectedValueFunctionImpl;
-import javastraw.reader.expected.MedianExpectedVector;
 import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
@@ -275,21 +274,18 @@ public class Dataset {
     }
 
     public ExpectedValueFunction getExpectedValues(HiCZoom zoom, NormalizationType type, boolean getCorrectedVersion) {
-        Map<String, ExpectedValueFunction> map = expectedValueFunctionMap;
-
-        if (map == null || zoom == null || type == null) return null;
+        if (expectedValueFunctionMap == null || zoom == null || type == null) return null;
         String key = ExpectedValueFunctionImpl.getKey(zoom, type);
         if (getCorrectedVersion) {
             return getCorrectedVersionOfExpectedVector(zoom, type);
         }
-        return map.get(key);
+        return expectedValueFunctionMap.get(key);
     }
 
     private ExpectedValueFunction getCorrectedVersionOfExpectedVector(HiCZoom zoom, NormalizationType type) {
         String key = ExpectedValueFunctionImpl.getKey(zoom, type);
-
         if (!correctedExpectedValueFunctionMap.containsKey(key)) {
-            ExpectedValueFunction corrected = MedianExpectedVector.generateVector(this, zoom, type);
+            ExpectedValueFunction corrected = expectedValueFunctionMap.get(key).getCorrectedVersion();
             correctedExpectedValueFunctionMap.put(key, corrected);
         }
         return correctedExpectedValueFunctionMap.get(key);

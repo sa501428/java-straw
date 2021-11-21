@@ -37,6 +37,7 @@ import java.util.Map;
  */
 public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 
+	private static final int FIVE_MB = 5000000;
 	private final DatasetReader reader;
 	private final int binSize;
 	private final NormalizationType type;
@@ -175,6 +176,14 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 			System.err.println("Expected values array is empty");
 			return null;
 		}
+	}
+
+	@Override
+	public ExpectedValueFunction getCorrectedVersion() {
+		streamExpectedVectorFromFileIfNeeded();
+		ListOfDoubleArrays smoothVector = expectedValues.deepClone();
+		smoothVector.doRollingMedian(FIVE_MB / binSize);
+		return new ExpectedValueFunctionImpl(type, unit, binSize, smoothVector, normFactors);
 	}
 
 	@Override

@@ -78,7 +78,7 @@ public class ExpectedValueCalculation {
      */
     private ListOfDoubleArrays densityAvg;
 
-    private int indexWhereSparsityStarts = -1;
+    private int indexWhereSparsityStarts;
 
     /**
      * Instantiate a DensityCalculation.  This constructor is used to compute the "expected" density from pair data.
@@ -91,6 +91,7 @@ public class ExpectedValueCalculation {
 
         this.type = type;
         this.binSize = binSize;
+        this.indexWhereSparsityStarts = 100000000 / binSize;
         long maxLen = 0;
 
         int maxNumChromosomes = chromosomeHandler.getMaxChromIndex() + 1;
@@ -222,10 +223,8 @@ public class ExpectedValueCalculation {
         ListOfDoubleArrays numEntriesForDist = new ListOfDoubleArrays(maxNumBins);
         for (int q = 0; q < maxNumBins; q++) {
             List<Double> values = new ArrayList<>(actualDistances.get(q));
-            if (values.size() < MIN_VALS_NEEDED) {
-                if (indexWhereSparsityStarts < 0) {
-                    indexWhereSparsityStarts = q;
-                }
+            if (values.size() < MIN_VALS_NEEDED && q < indexWhereSparsityStarts) {
+                indexWhereSparsityStarts = q;
             }
 
             int window = 0;

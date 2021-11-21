@@ -185,6 +185,8 @@ public class ListOfDoubleArrays {
 			System.exit(-3);
 		}
 		double[] data = internalList.get(0);
+		if (startIndex >= data.length) return;
+
 		double[] secondArray = new double[data.length - startIndex];
 		for (int z = 0; z < secondArray.length; z++) {
 			secondArray[z] = getSafeMean(data, startIndex + z - window, startIndex + z + window);

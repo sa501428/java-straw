@@ -234,6 +234,8 @@ public class OldExpectedValueCalculation {
             // Otherwise, bound2 is at limit already
         }
 
+        densityAvg.doRollingMedian(100);
+
         // Compute fudge factors for each chromosome so the total "expected" count for that chromosome == the observed
 
         for (Chromosome chr : chromosomesMap.values()) {

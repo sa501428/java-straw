@@ -24,6 +24,8 @@
 
 package javastraw.reader.datastructures;
 
+import javastraw.reader.expected.QuickMedian;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -202,5 +204,30 @@ public class ListOfDoubleArrays {
 			total += data[q];
 		}
 		return total / (end - start);
+	}
+
+	public void doRollingMedian(int window) {
+		if (window > DEFAULT_LENGTH || internalList.size() > 1) {
+			System.err.println("ERROR: NOT YET IMPLEMENTED!!!");
+			System.exit(-3);
+		}
+		double[] data = internalList.get(0);
+		if (window >= data.length) return;
+
+		double[] secondArray = new double[data.length - window];
+		for (int z = 0; z < secondArray.length; z++) {
+			secondArray[z] = getSafeMedian(data, z, z + window + window);
+		}
+		System.arraycopy(secondArray, 0, data, window, secondArray.length);
+	}
+
+	private double getSafeMedian(double[] data, int potentialStart, int potentialEnd) {
+		int start = Math.max(0, potentialStart);
+		int end = Math.min(data.length, potentialEnd);
+		List<Double> values = new ArrayList<>();
+		for (int q = start; q < end; q++) {
+			values.add(data[q]);
+		}
+		return QuickMedian.fastMedian(values);
 	}
 }

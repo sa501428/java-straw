@@ -212,7 +212,7 @@ public class ListOfDoubleArrays {
 			System.exit(-3);
 		}
 		double[] data = internalList.get(0);
-		if (window >= data.length) return;
+		if (window >= data.length || window < 1) return;
 
 		double[] secondArray = new double[data.length - window];
 		List<Double> values = getInitialList(window, data);

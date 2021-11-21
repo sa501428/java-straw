@@ -16,9 +16,9 @@ public class Tester {
         ChromosomeHandler chromosomeHandler = ds.getChromosomeHandler();
         NormalizationType norm = ds.getNormalizationHandler().getNormTypeFromString("KR");
 
-        ListOfDoubleArrays d1 = ds.getExpectedValues(new HiCZoom(HiCZoom.HiCUnit.BP, 50000),
+        ListOfDoubleArrays d1 = ds.getExpectedValues(new HiCZoom(HiCZoom.HiCUnit.BP, 5000),
                 norm, false).getExpectedValuesWithNormalization(1);
-        ListOfDoubleArrays d2 = ds.getExpectedValues(new HiCZoom(HiCZoom.HiCUnit.BP, 50000),
+        ListOfDoubleArrays d2 = ds.getExpectedValues(new HiCZoom(HiCZoom.HiCUnit.BP, 5000),
                 norm, true).getExpectedValuesWithNormalization(1);
 
         MatrixTools.saveMatrixTextNumpy("/Users/mshamim/Desktop/exp1.npy", d1.getValues().get(0));

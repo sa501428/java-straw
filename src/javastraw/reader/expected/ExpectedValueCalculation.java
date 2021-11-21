@@ -52,6 +52,7 @@ public class ExpectedValueCalculation {
     // used for sparsity cutoff
     private static final int MIN_VALS_NEEDED = 400;
     private final int binSize;
+    private final int smoothingWindow;
 
     private final int numberOfBins;
     /**
@@ -72,6 +73,7 @@ public class ExpectedValueCalculation {
      * Chromosome in this genome, needed for normalizations
      */
     private final Chromosome[] chromosomesMap;
+    private final int FIVE_MB = 5000000;
     /**
      * Expected count at a given binned distance from diagonal
      */
@@ -88,7 +90,7 @@ public class ExpectedValueCalculation {
 
         this.type = type;
         this.binSize = binSize;
-        long maxLen = 0;
+        smoothingWindow = Math.max(0, FIVE_MB / binSize);
 
         int maxNumChromosomes = chromosomeHandler.getMaxChromIndex() + 1;
         chromosomesMap = new Chromosome[maxNumChromosomes];
@@ -96,6 +98,7 @@ public class ExpectedValueCalculation {
         chromosomeCounts = new double[maxNumChromosomes];
         chrScaleFactors = new double[maxNumChromosomes];
 
+        long maxLen = 0;
         for (Chromosome chromosome : chromosomeHandler.getChromosomeArrayWithoutAllByAll()) {
             if (chromosome != null) {
                 chromosomesMap[chromosome.getIndex()] = chromosome;
@@ -207,7 +210,7 @@ public class ExpectedValueCalculation {
             // Otherwise, bound2 is at limit already
         }
 
-        densityAvg.doRollingMedian(100);
+        densityAvg.doRollingMedian(smoothingWindow);
 
         // Compute fudge factors for each chromosome so the total "expected" count for that chromosome == the observed
 

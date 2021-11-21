@@ -50,6 +50,8 @@ import java.util.*;
  */
 public class ExpectedValueCalculation {
 
+    // used for sparsity cutoff
+    private static final int MIN_VALS_NEEDED = 400;
     private final int binSize;
 
     private final int numberOfBins;
@@ -75,6 +77,8 @@ public class ExpectedValueCalculation {
      * Expected count at a given binned distance from diagonal
      */
     private ListOfDoubleArrays densityAvg;
+
+    private int indexWhereSparsityStarts = -1;
 
     /**
      * Instantiate a DensityCalculation.  This constructor is used to compute the "expected" density from pair data.
@@ -218,8 +222,14 @@ public class ExpectedValueCalculation {
         ListOfDoubleArrays numEntriesForDist = new ListOfDoubleArrays(maxNumBins);
         for (int q = 0; q < maxNumBins; q++) {
             List<Double> values = new ArrayList<>(actualDistances.get(q));
+            if (values.size() < MIN_VALS_NEEDED) {
+                if (indexWhereSparsityStarts < 0) {
+                    indexWhereSparsityStarts = q;
+                }
+            }
+
             int window = 0;
-            while (values.size() < 400) {
+            while (values.size() < MIN_VALS_NEEDED) {
                 window++;
                 if (q - window > -1) {
                     values.addAll(actualDistances.get(q - window));
@@ -235,6 +245,9 @@ public class ExpectedValueCalculation {
         actualDistances.clear();
         // previously mean window 400
         // now median window, 400
+
+        // rolling mean from 1st sparse index
+        densityAvg.doRollingMeanFromIndex(indexWhereSparsityStarts, 100);
 
         // Compute fudge factors for each chromosome so the total "expected" count for that chromosome == the observed
 

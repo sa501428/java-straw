@@ -178,4 +178,27 @@ public class ListOfDoubleArrays {
 		}
 		return newList;
 	}
+
+	public void doRollingMeanFromIndex(int startIndex, int window) {
+		if (startIndex > DEFAULT_LENGTH || internalList.size() > 1) {
+			System.err.println("ERROR: NOT YET IMPLEMENTED!!!");
+			System.exit(-3);
+		}
+		double[] data = internalList.get(0);
+		double[] secondArray = new double[data.length - startIndex];
+		for (int z = 0; z < secondArray.length; z++) {
+			secondArray[z] = getSafeMean(data, startIndex + z - window, startIndex + z + window);
+		}
+		System.arraycopy(secondArray, 0, data, startIndex, secondArray.length);
+	}
+
+	private double getSafeMean(double[] data, int potentialStart, int potentialEnd) {
+		int start = Math.max(0, potentialStart);
+		int end = Math.min(data.length, potentialEnd);
+		double total = 0;
+		for (int q = start; q < end; q++) {
+			total += data[q];
+		}
+		return total / (end - start);
+	}
 }

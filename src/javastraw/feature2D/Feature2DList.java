@@ -511,7 +511,7 @@ public class Feature2DList {
      * @param key
      * @return
      */
-    List<Feature2D> getFeatureList(String key) {
+    public List<Feature2D> getFeatureList(String key) {
         return featureList.get(key);
     }
 

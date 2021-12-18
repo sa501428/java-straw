@@ -65,7 +65,6 @@ public class QuickMedian {
         return z + 1;
     }
 
-
     public static void doRollingMedian(double[] data, int window) {
         if (window >= data.length || window < 1) return;
 

@@ -34,7 +34,7 @@ import java.util.*;
  */
 public class Feature2D implements Comparable<Feature2D> {
 
-    static final String genericHeader = "#chr1\tx1\tx2\tchr2\ty1\ty2\tname\tscore\tstrand1\tstrand2\tcolor";
+    public static final String genericHeader = "#chr1\tx1\tx2\tchr2\ty1\ty2\tname\tscore\tstrand1\tstrand2\tcolor";
     private static final String BEDPE_SPACER = "\t.\t.\t.\t.";
     public static int tolerance = 0;
     final FeatureType featureType;
@@ -192,6 +192,10 @@ public class Feature2D implements Comparable<Feature2D> {
         ArrayList<String> keys = new ArrayList<>(attributes.keySet());
         Collections.sort(keys);
         return keys;
+    }
+
+    public boolean hasAttributeKey(String key) {
+        return attributes.containsKey(key);
     }
 
     public String getAttribute(String key) {

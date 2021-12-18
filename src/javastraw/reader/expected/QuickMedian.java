@@ -68,26 +68,30 @@ public class QuickMedian {
     public static void doRollingMedian(double[] data, int window) {
         if (window >= data.length || window < 1) return;
 
-        double[] secondArray = new double[data.length - window];
-        List<Double> values = getInitialList(window, data);
-        for (int z = 0; z < secondArray.length; z++) {
-            secondArray[z] = QuickMedian.fastMedian(values);
+        double[] smoothArray = new double[data.length];
+        List<Double> values = new ArrayList<>();
+        int numValsCounter = 0;
+        values.add(data[numValsCounter]);
+        for (int z = 0; z < window; z++) {
+            smoothArray[z] = QuickMedian.fastMedian(values);
+            values.add(data[numValsCounter + 1]);
+            values.add(data[numValsCounter + 2]);
+            numValsCounter += 2;
+            //System.err.println("size " + values.size());
+        }
+
+        //System.err.println("DL " + data.length);
+
+        for (int z = window; z < smoothArray.length; z++) {
+            //System.err.println("size " + values.size());
+            smoothArray[z] = QuickMedian.fastMedian(values);
+            //if(values.)
             values.remove(0);
-            int nextIndexToAdd = 2 * (window + 1) + z;
+            int nextIndexToAdd = (window + 1) + z;
             if (nextIndexToAdd < data.length) {
                 values.add(data[nextIndexToAdd]);
             }
         }
-        System.arraycopy(secondArray, 0, data, window, secondArray.length);
-    }
-
-    private static List<Double> getInitialList(int window, double[] data) {
-        int start = 0;
-        int end = 2 * (window + 1);
-        List<Double> values = new ArrayList<>();
-        for (int q = start; q < end; q++) {
-            values.add(data[q]);
-        }
-        return values;
+        System.arraycopy(smoothArray, 0, data, 0, data.length);
     }
 }

@@ -22,17 +22,10 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.reader.basics.chrom.sizes;
 
-public class HiCGlobals {
-
-    public static final String versionNum = "1.07.05";
-
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
-
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+/**
+ * Empty class for directing *.sizes file tracking
+ */
+public class ChromosomeSizes {
 }

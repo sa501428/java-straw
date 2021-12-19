@@ -35,7 +35,7 @@ import java.util.*;
 /**
  * Created by muhammadsaadshamim on 11/17/15.
  */
-public class GenomeWideList<T extends Feature> {
+public class GenomeWide1DList<T extends Feature1D> {
 
     /**
      * Genome-wide list of features, where each string is a key for an
@@ -49,13 +49,13 @@ public class GenomeWideList<T extends Feature> {
      * Private constructor only used for cloning
      * todo delete / make private @mss
      */
-    public GenomeWideList() {
+    public GenomeWide1DList() {
     }
 
     /**
      * @param handler
      */
-    public GenomeWideList(ChromosomeHandler handler) {
+    public GenomeWide1DList(ChromosomeHandler handler) {
         for (Chromosome c : handler.getChromosomeArray()) {
             featureLists.put("" + c.getIndex(), new ArrayList<>());
         }
@@ -65,7 +65,7 @@ public class GenomeWideList<T extends Feature> {
      * @param handler
      * @param features to be added to list
      */
-    public GenomeWideList(ChromosomeHandler handler, List<T> features) {
+    public GenomeWide1DList(ChromosomeHandler handler, List<T> features) {
         this(handler);
         addAll(features);
     }
@@ -79,8 +79,8 @@ public class GenomeWideList<T extends Feature> {
      *
      * @param gwList
      */
-    public GenomeWideList(final GenomeWideList<T> gwList) {
-        processLists(new FeatureFunction<T>() {
+    public GenomeWide1DList(final GenomeWide1DList<T> gwList) {
+        processLists(new Feature1DFunction<T>() {
             @Override
             public void process(String chr, List<T> featureList) {
                 if (gwList.containsKey(chr)) {
@@ -140,7 +140,7 @@ public class GenomeWideList<T extends Feature> {
      *
      * @param filter
      */
-    public synchronized void filterLists(FeatureFilter<T> filter) {
+    public synchronized void filterLists(Feature1DFilter<T> filter) {
         for (String chr : featureLists.keySet()) {
             featureLists.put(chr, filter.filter(chr, featureLists.get(chr)));
         }
@@ -153,7 +153,7 @@ public class GenomeWideList<T extends Feature> {
      *
      * @param function
      */
-    public synchronized void processLists(FeatureFunction<T> function) {
+    public synchronized void processLists(Feature1DFunction<T> function) {
         for (String key : featureLists.keySet()) {
             function.process(key, featureLists.get(key));
         }
@@ -162,8 +162,8 @@ public class GenomeWideList<T extends Feature> {
     /**
      * @return deep copy of the anchor list
      */
-    public GenomeWideList<T> deepClone() {
-        GenomeWideList<T> clone = new GenomeWideList<>();
+    public GenomeWide1DList<T> deepClone() {
+        GenomeWide1DList<T> clone = new GenomeWide1DList<>();
         for (String key : featureLists.keySet()) {
             clone.featureLists.put(key, cloneFeatureList(featureLists.get(key)));
         }
@@ -209,7 +209,7 @@ public class GenomeWideList<T extends Feature> {
     public void simpleExport(final File file) {
         try {
             final FileWriter fw = new FileWriter(file);
-            processLists(new FeatureFunction<T>() {
+            processLists(new Feature1DFunction<T>() {
                 @Override
                 public void process(String chr, List<T> featureList) {
                     for (T t : featureList) {

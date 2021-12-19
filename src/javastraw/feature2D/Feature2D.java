@@ -202,6 +202,10 @@ public class Feature2D implements Comparable<Feature2D> {
         return attributes.get(key);
     }
 
+    public Map<String, String> getAttributes() {
+        return attributes;
+    }
+
     public void setAttribute(String key, String newVal) {
         attributes.put(key, newVal);
         // attribute directly shared between reflections

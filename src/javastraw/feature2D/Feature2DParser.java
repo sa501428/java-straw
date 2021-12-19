@@ -45,7 +45,7 @@ public class Feature2DParser {
     private static final int BUFFER_SIZE = 2097152;
 
     public static Feature2DList loadFeatures(String path, ChromosomeHandler handler, boolean loadAttributes,
-                                             FeatureFilter featureFilter, final boolean useFeature2DWithMotif) {
+                                             Feature2DFilter featureFilter, final boolean useFeature2DWithMotif) {
         Feature2DList newList;
         String lowerCaseEnding = path.toLowerCase();
         if (lowerCaseEnding.endsWith(".bedpe")) {
@@ -103,7 +103,7 @@ public class Feature2DParser {
 
 
     private static Feature2DList parseGeneralFile(String path, ChromosomeHandler handler, boolean loadAttributes,
-                                                  FeatureFilter featureFilter, SpecificParser parser) {
+                                                  Feature2DFilter featureFilter, SpecificParser parser) {
         Feature2DList newList = new Feature2DList();
         try {
             //BufferedReader br = ParsingUtils.openBufferedReader(path);

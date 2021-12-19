@@ -104,7 +104,7 @@ public class Feature2DList {
     public static Feature2DList getIntersection(final Feature2DList listA, Feature2DList listB) {
 
         Feature2DList commonFeatures = new Feature2DList(listB);
-        commonFeatures.filterLists(new FeatureFilter() {
+        commonFeatures.filterLists(new Feature2DFilter() {
             @Override
             public List<Feature2D> filter(String chr, List<Feature2D> feature2DList) {
                 List<Feature2D> commonVals = new ArrayList<>();
@@ -146,7 +146,7 @@ public class Feature2DList {
         return repeat;
     }
 
-    public void parallelizedProcessLists(FeatureFunction featureFunction) {
+    public void parallelizedProcessLists(Feature2DFunction featureFunction) {
         List<String> keys = new ArrayList<>(featureList.keySet());
         Collections.sort(keys);
         ExecutorService executor = Executors.newFixedThreadPool(keys.size());
@@ -169,7 +169,7 @@ public class Feature2DList {
      *
      * @param filter
      */
-    public synchronized void filterLists(FeatureFilter filter) {
+    public synchronized void filterLists(Feature2DFilter filter) {
         List<String> keys = new ArrayList<>(featureList.keySet());
         Collections.sort(keys);
         for (String key : keys) {
@@ -278,7 +278,7 @@ public class Feature2DList {
     }
 
     private synchronized List<Feature2D> updateAttributes(List<Feature2D> features) {
-        processLists(new FeatureFunction() {
+        processLists(new Feature2DFunction() {
             @Override
             public void process(String chr, List<Feature2D> feature2DList) {
                 for (Feature2D feature : feature2DList) {
@@ -322,7 +322,7 @@ public class Feature2DList {
             Feature2D featureZero = extractSingleFeature();
             if (featureZero != null) {
                 outputFilePrintWriter.println(featureZero.getOutputFileHeader());
-                processLists(new FeatureFunction() {
+                processLists(new Feature2DFunction() {
                     @Override
                     public void process(String chr, List<Feature2D> feature2DList) {
                         Collections.sort(feature2DList);
@@ -385,7 +385,7 @@ public class Feature2DList {
      * @param color
      */
     public void setColor(final Color color) {
-        processLists(new FeatureFunction() {
+        processLists(new Feature2DFunction() {
             @Override
             public void process(String chr, List<Feature2D> feature2DList) {
                 for (Feature2D feature : feature2DList) {
@@ -472,7 +472,7 @@ public class Feature2DList {
     }
 
     public synchronized void addAttributeFieldToAll(final String newAttributeName, final String newAttributeValue) {
-        processLists(new FeatureFunction() {
+        processLists(new Feature2DFunction() {
             @Override
             public void process(String chr, List<Feature2D> feature2DList) {
                 for (Feature2D feature : feature2DList) {
@@ -488,7 +488,7 @@ public class Feature2DList {
      * TODO more detailed filtering by size/position/etc? NOTE that this is used by HiCCUPS
      */
     public void removeDuplicates() {
-        filterLists(new FeatureFilter() {
+        filterLists(new Feature2DFilter() {
             @Override
             public List<Feature2D> filter(String chr, List<Feature2D> feature2DList) {
                 return new ArrayList<>(new HashSet<>(feature2DList));
@@ -520,7 +520,7 @@ public class Feature2DList {
      *
      * @param function
      */
-    public synchronized void processLists(FeatureFunction function) {
+    public synchronized void processLists(Feature2DFunction function) {
         List<String> keys = new ArrayList<>(featureList.keySet());
         Collections.sort(keys);
         for (String key : keys) {
@@ -576,7 +576,7 @@ public class Feature2DList {
     public Feature2D searchForFeature(final int c1, final int start1, final int end1,
                                       final int c2, final int start2, final int end2) {
         final Feature2D[] feature = new Feature2D[1];
-        processLists(new FeatureFunction() {
+        processLists(new Feature2DFunction() {
             @Override
             public void process(String chr, List<Feature2D> feature2DList) {
                 for (Feature2D f : feature2DList) {
@@ -592,7 +592,7 @@ public class Feature2DList {
     }
 
     public void clearAllAttributes() {
-        processLists(new FeatureFunction() {
+        processLists(new Feature2DFunction() {
             @Override
             public void process(String chr, List<Feature2D> feature2DList) {
                 for (Feature2D feature : feature2DList) {

@@ -22,13 +22,13 @@
  *  THE SOFTWARE.
  */
 
-package javastraw.feature1D;
+package javastraw.feature2D;
+
+import java.util.List;
 
 /**
- * Created by muhammadsaadshamim on 11/17/15.
+ * Created by muhammadsaadshamim on 7/30/15.
  */
-public abstract class Feature {
-    public abstract String getKey();
-
-    public abstract Feature deepClone();
+public interface Feature2DFunction {
+    void process(String chr, List<Feature2D> feature2DList);
 }

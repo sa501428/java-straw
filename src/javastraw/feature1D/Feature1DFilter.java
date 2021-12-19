@@ -29,6 +29,6 @@ import java.util.List;
 /**
  * Created by muhammadsaadshamim on 7/30/15.
  */
-public interface FeatureFilter<T> {
+public interface Feature1DFilter<T> {
     List<T> filter(String chr, List<T> featureList);
 }

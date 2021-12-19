@@ -22,13 +22,13 @@
  *  THE SOFTWARE.
  */
 
-package javastraw.feature2D;
+package javastraw.feature1D;
 
 import java.util.List;
 
 /**
  * Created by muhammadsaadshamim on 7/30/15.
  */
-public interface FeatureFilter {
-    List<Feature2D> filter(String chr, List<Feature2D> feature2DList);
+public interface Feature1DFunction<T> {
+    void process(String chr, List<T> featureList);
 }

@@ -22,17 +22,57 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.matrices;
 
-public class HiCGlobals {
+import java.util.Collection;
+import java.util.HashMap;
 
-    public static final String versionNum = "1.09.01";
+/**
+ * Simple representation of a sparse vector.   C
+ */
+class SparseVector {
 
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
+    private final int length;
+    private final HashMap<Integer, Double> values;
 
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+    public SparseVector(int length) {
+        this.length = length;
+        values = new HashMap<>();
+    }
+
+    public void set(Integer i, Double v) {
+        if (i >= length) {
+            throw new IndexOutOfBoundsException("Index " + i + " is >= length " + length);
+        }
+        values.put(i, v);
+    }
+
+    public int getLength() {
+        return length;
+    }
+
+    public Double get(Integer idx) {
+        return values.getOrDefault(idx, 0.0);
+    }
+
+    public Collection<Integer> getIndeces() {
+        return values.keySet();
+    }
+
+    /**
+     * Computes the mean of occupied elements
+     *
+     * @return
+     */
+    public Double getMean() {
+
+        if (values.size() == 0) return Double.NaN;
+
+        double sum = 0;
+        for (Double v : values.values()) {
+            sum += v;
+        }
+        return sum / values.size();
+
+    }
 }

@@ -22,17 +22,22 @@
  *  THE SOFTWARE.
  */
 
-package javastraw;
+package javastraw.matrices;
 
-public class HiCGlobals {
+/**
+ * @author jrobinso 7/13/12
+ */
+public interface BasicMatrix {
 
-    public static final String versionNum = "1.09.01";
+    float getEntry(int row, int col);
 
-    // min hic file version supported
-    public static final int minVersion = 6;
-    public static final int bufferSize = 2097152;
+    int getRowDimension();
 
-    // implement Map scaling with this global variable
-    public static boolean allowDynamicBlockIndex = true;
-    public static boolean printVerboseComments = false;
+    int getColumnDimension();
+
+    float getLowerValue();
+
+    float getUpperValue();
+
+    void setEntry(int i, int j, float corr);
 }

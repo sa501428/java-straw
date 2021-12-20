@@ -27,6 +27,7 @@ package javastraw.reader.mzd;
 
 import htsjdk.tribble.util.LittleEndianOutputStream;
 import javastraw.HiCGlobals;
+import javastraw.matrices.BasicMatrix;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.block.Block;
@@ -35,6 +36,7 @@ import javastraw.reader.depth.LogDepth;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.iterators.IteratorContainer;
+import javastraw.reader.pearsons.Pearsons;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.MatrixType;
 import javastraw.reader.type.NormalizationType;
@@ -64,6 +66,9 @@ public class MatrixZoomData {
     protected DatasetReader reader;
     private IteratorContainer iteratorContainer = null;
     private boolean useCache = true;
+    private final Map<NormalizationType, BasicMatrix> pearsonsMap;
+    private final long correctedBinCount;
+
 
     /**
      * Constructor, sets the grid axes.  Called when read from file.
@@ -91,8 +96,6 @@ public class MatrixZoomData {
             v9Depth = new LogDepth(2, blockBinCount);
         }
         this.blockColumnCount = blockColumnCount;
-
-        long correctedBinCount = blockBinCount;
         if (!(this instanceof DynamicMatrixZoomData)) {
             if (reader.getVersion() < 8 && chr1.getLength() < chr2.getLength()) {
                 boolean isFrag = zoom.getUnit() == HiCZoom.HiCUnit.FRAG;
@@ -104,8 +107,13 @@ public class MatrixZoomData {
                 }
                 long nBinsX = Math.max(len1, len2) / zoom.getBinSize() + 1;
                 correctedBinCount = nBinsX / blockColumnCount + 1;
+            } else {
+                correctedBinCount = blockBinCount;
             }
+        } else {
+            correctedBinCount = blockBinCount;
         }
+        pearsonsMap = new HashMap<>();
     }
 
     public void setUseCache(boolean useCache) {
@@ -130,6 +138,10 @@ public class MatrixZoomData {
 
     public int getChr2Idx() {
         return chr2.getIndex();
+    }
+
+    protected long getCorrectedBinCount() {
+        return correctedBinCount;
     }
 
     public HiCZoom getZoom() {
@@ -788,5 +800,60 @@ public class MatrixZoomData {
             iteratorContainer = new IteratorContainer(reader, this, blockCache, useCache);
         }
         return iteratorContainer;
+    }
+
+
+    public BasicMatrix getPearsons(ExpectedValueFunction df) {
+        boolean readPearsons = false; // check if were able to read in
+        // try to get from local cache
+        BasicMatrix pearsons = pearsonsMap.get(df.getNormalizationType());
+        if (pearsons != null) {
+            return pearsons;
+        }
+        // we weren't able to read in the Pearsons. check that the resolution is low enough to calculate
+        pearsons = computePearsons(df);
+        pearsonsMap.put(df.getNormalizationType(), pearsons);
+        return pearsonsMap.get(df.getNormalizationType());
+    }
+
+    private BasicMatrix computePearsons(ExpectedValueFunction df) {
+        if (chr1 != chr2) {
+            throw new RuntimeException("Cannot compute pearsons for non-diagonal matrices");
+        }
+
+        int dim = (int) (chr1.getLength() / zoom.getBinSize()) + 1;
+
+        // Compute O/E column vectors
+        double[][] oeMatrix = new double[dim][dim];
+        BitSet bitSet = new BitSet(dim);
+        populateOEMatrixAndBitset(oeMatrix, bitSet, df);
+
+        BasicMatrix pearsons;
+        pearsons = Pearsons.computeParallelizedPearsons(oeMatrix, dim, bitSet);
+
+        pearsonsMap.put(df.getNormalizationType(), pearsons);
+        return pearsons;
+    }
+
+    private void populateOEMatrixAndBitset(double[][] oeMatrix, BitSet bitSet, ExpectedValueFunction df) {
+        Iterator<ContactRecord> iterator = getNewContactRecordIterator();
+        while (iterator.hasNext()) {
+            ContactRecord record = iterator.next();
+            float counts = record.getCounts();
+            if (Float.isNaN(counts)) continue;
+
+            int i = record.getBinX();
+            int j = record.getBinY();
+            int dist = Math.abs(i - j);
+
+            double expected = df.getExpectedValue(chr1.getIndex(), dist);
+            double oeValue = counts / expected;
+
+            oeMatrix[i][j] = oeValue;
+            oeMatrix[j][i] = oeValue;
+
+            bitSet.set(i);
+            bitSet.set(j);
+        }
     }
 }

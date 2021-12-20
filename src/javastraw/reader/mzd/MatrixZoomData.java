@@ -69,7 +69,6 @@ public class MatrixZoomData {
     private final Map<NormalizationType, BasicMatrix> pearsonsMap;
     private final long correctedBinCount;
 
-
     /**
      * Constructor, sets the grid axes.  Called when read from file.
      *
@@ -140,7 +139,7 @@ public class MatrixZoomData {
         return chr2.getIndex();
     }
 
-    protected long getCorrectedBinCount() {
+    public long getCorrectedBinCount() {
         return correctedBinCount;
     }
 
@@ -792,7 +791,6 @@ public class MatrixZoomData {
 
     private Iterator<ContactRecord> getNewContactRecordIterator() {
         return getIteratorContainer().getNewContactRecordIterator();
-        //return new ContactRecordIterator(reader, this, blockCache);
     }
 
     public IteratorContainer getIteratorContainer() {
@@ -801,7 +799,6 @@ public class MatrixZoomData {
         }
         return iteratorContainer;
     }
-
 
     public BasicMatrix getPearsons(ExpectedValueFunction df) {
         boolean readPearsons = false; // check if were able to read in

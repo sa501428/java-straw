@@ -26,7 +26,6 @@
 package javastraw.reader.mzd;
 
 import htsjdk.tribble.util.LittleEndianOutputStream;
-import javastraw.HiCGlobals;
 import javastraw.matrices.BasicMatrix;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
@@ -40,6 +39,7 @@ import javastraw.reader.pearsons.Pearsons;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.MatrixType;
 import javastraw.reader.type.NormalizationType;
+import javastraw.tools.ParallelizationTools;
 import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
@@ -47,7 +47,6 @@ import java.io.PrintWriter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MatrixZoomData {
@@ -59,6 +58,7 @@ public class MatrixZoomData {
     // Observed values are organized into sub-matrices ("blocks")
     protected final int blockBinCount;   // block size in bins
     protected final int blockColumnCount;     // number of block columns
+    private final long correctedBinCount;
     // Cache the last 20 blocks loaded
     protected final LRUCache<String, Block> blockCache = new LRUCache<>(500);
     private final V9Depth v9Depth;
@@ -67,7 +67,7 @@ public class MatrixZoomData {
     private IteratorContainer iteratorContainer = null;
     private boolean useCache = true;
     private final Map<NormalizationType, BasicMatrix> pearsonsMap;
-    private final long correctedBinCount;
+
 
     /**
      * Constructor, sets the grid axes.  Called when read from file.
@@ -143,6 +143,10 @@ public class MatrixZoomData {
         return correctedBinCount;
     }
 
+    public int getBlockBinCount() {
+        return blockBinCount;
+    }
+
     public HiCZoom getZoom() {
         return zoom;
     }
@@ -155,7 +159,6 @@ public class MatrixZoomData {
         return chr1.getName() + "_" + chr2.getName() + "_" + zoom.getKey();
     }
 
-    // i think this is how it should be? todo sxxgrc please confirm use case
     private String getKey(int chr1, int chr2) {
         return chr1 + "_" + chr2 + "_" + zoom.getKey();
     }
@@ -355,103 +358,43 @@ public class MatrixZoomData {
         final AtomicInteger errorCounter = new AtomicInteger();
 
         ExecutorService service = Executors.newFixedThreadPool(200);
-
-        final int binSize = getBinSize();
-        final int chr1Index = chr1.getIndex();
-        final int chr2Index = chr2.getIndex();
-
         for (final int blockNumber : blocksToLoad) {
-            Runnable loader = new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        String key = getBlockKey(blockNumber, no);
-                        Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, no);
-                        if (b == null) {
-                            b = new Block(blockNumber, key);   // An empty block
-                        }
-                        //Run out of memory if do it here
-                        if (useCache) {
-                            blockCache.put(key, b);
-                        }
-                        blockList.add(b);
-                    } catch (IOException e) {
-                        errorCounter.incrementAndGet();
-                    }
-                }
-            };
-
-            service.submit(loader);
+            String key = getBlockKey(blockNumber, no);
+            readBlockUpdateListAndCache(blockNumber, reader, no, blockList, key, errorCounter, service);
         }
-
-        // done submitting all jobs
-        service.shutdown();
-
-        // wait for all to finish
-        try {
-            service.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-        } catch (InterruptedException e) {
-            System.err.println("Error loading mzd data " + e.getLocalizedMessage());
-            if (HiCGlobals.printVerboseComments) {
-                e.printStackTrace();
-            }
-        }
-
-        // error printing
-        if (errorCounter.get() > 0) {
-            System.err.println(errorCounter.get() + " errors while reading blocks");
-        }
+        ParallelizationTools.shutDownServiceAndWait(service, errorCounter);
     }
 
     private void actuallyLoadGivenBlocks(final List<Block> blockList, Set<Integer> blocksToLoad,
                                          final NormalizationType no, final int chr1Id, final int chr2Id) {
         final AtomicInteger errorCounter = new AtomicInteger();
-
         ExecutorService service = Executors.newFixedThreadPool(200);
-
-        final int binSize = getBinSize();
-
         for (final int blockNumber : blocksToLoad) {
-            Runnable loader = new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        String key = getBlockKey(blockNumber, no, chr1Id, chr2Id);
-                        Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, no);
-                        if (b == null) {
-                            b = new Block(blockNumber, key);   // An empty block
-                        }
-                        //Run out of memory if do it here
-                        if (useCache) {
-                            blockCache.put(key, b);
-                        }
-                        blockList.add(b);
-                    } catch (IOException e) {
-                        errorCounter.incrementAndGet();
-                    }
+            String key = getBlockKey(blockNumber, no, chr1Id, chr2Id);
+            readBlockUpdateListAndCache(blockNumber, reader, no, blockList, key, errorCounter, service);
+        }
+        ParallelizationTools.shutDownServiceAndWait(service, errorCounter);
+    }
+
+    private void readBlockUpdateListAndCache(int blockNumber, DatasetReader reader, NormalizationType no,
+                                             List<Block> blockList, String key, final AtomicInteger errorCounter,
+                                             ExecutorService service) {
+        Runnable loader = () -> {
+            try {
+                Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, no);
+                if (b == null) {
+                    b = new Block(blockNumber, key);
                 }
-            };
 
-            service.submit(loader);
-        }
-
-        // done submitting all jobs
-        service.shutdown();
-
-        // wait for all to finish
-        try {
-            service.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
-        } catch (InterruptedException e) {
-            System.err.println("Error loading mzd data " + e.getLocalizedMessage());
-            if (HiCGlobals.printVerboseComments) {
-                e.printStackTrace();
+                if (useCache) {
+                    blockCache.put(key, b);
+                }
+                blockList.add(b);
+            } catch (IOException e) {
+                errorCounter.incrementAndGet();
             }
-        }
-
-        // error printing
-        if (errorCounter.get() > 0) {
-            System.err.println(errorCounter.get() + " errors while reading blocks");
-        }
+        };
+        service.submit(loader);
     }
 
     /**
@@ -783,6 +726,7 @@ public class MatrixZoomData {
 
     public void clearCache() {
         blockCache.clear();
+        pearsonsMap.clear();
     }
 
     public long getNumberOfContactRecords() {

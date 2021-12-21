@@ -38,15 +38,10 @@ public class Matrix {
     private final int chr1;
     private final int chr2;
     private final static Set<Pair<Integer, Integer>> dynamicZoomResolutions = new HashSet<>();
-    protected List<MatrixZoomData> bpZoomData = new ArrayList<>();
-    protected List<MatrixZoomData> fragZoomData = new ArrayList<>();
-    protected List<MatrixZoomData> dynamicBPZoomData = new ArrayList<>();
-    private final Comparator<MatrixZoomData> comparator = new Comparator<MatrixZoomData>() {
-        @Override
-        public int compare(MatrixZoomData o1, MatrixZoomData o2) {
-            return o2.getBinSize() - o1.getBinSize();
-        }
-    };
+    protected final List<MatrixZoomData> bpZoomData = new ArrayList<>();
+    protected final List<MatrixZoomData> fragZoomData = new ArrayList<>();
+    protected final List<MatrixZoomData> dynamicBPZoomData = new ArrayList<>();
+    private final Comparator<MatrixZoomData> comparator = (o1, o2) -> o2.getBinSize() - o1.getBinSize();
 
     /**
      * Constructor for creating a matrix from precomputed data.
@@ -179,5 +174,26 @@ public class Matrix {
 
     public boolean isNotIntra() {
         return chr1 != chr2;
+    }
+
+    public void clearCache() {
+        for (MatrixZoomData mzd : bpZoomData) {
+            try {
+                mzd.clearCache();
+            } catch (Exception e) {
+            }
+        }
+        for (MatrixZoomData mzd : fragZoomData) {
+            try {
+                mzd.clearCache();
+            } catch (Exception e) {
+            }
+        }
+        for (MatrixZoomData mzd : dynamicBPZoomData) {
+            try {
+                mzd.clearCache();
+            } catch (Exception e) {
+            }
+        }
     }
 }

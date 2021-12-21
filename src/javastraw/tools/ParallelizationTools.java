@@ -24,10 +24,14 @@
 
 package javastraw.tools;
 
+import javastraw.HiCGlobals;
+
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
-public class ParallelizedJuicerTools {
+public class ParallelizationTools {
 
     public static void launchParallelizedCode(Runnable runnable) {
         launchParallelizedCode(Runtime.getRuntime().availableProcessors(), runnable);
@@ -48,6 +52,26 @@ public class ParallelizedJuicerTools {
 
         // Wait until all threads finish
         while (!executor.isTerminated()) {
+        }
+    }
+
+    public static void shutDownServiceAndWait(ExecutorService service, AtomicInteger errorCounter) {
+        // done submitting all jobs
+        service.shutdown();
+
+        // wait for all to finish
+        try {
+            service.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+        } catch (InterruptedException e) {
+            System.err.println("Error loading mzd data " + e.getLocalizedMessage());
+            if (HiCGlobals.printVerboseComments) {
+                e.printStackTrace();
+            }
+        }
+
+        // error printing
+        if (errorCounter.get() > 0) {
+            System.err.println(errorCounter.get() + " errors while reading blocks");
         }
     }
 }

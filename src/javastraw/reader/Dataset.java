@@ -48,8 +48,7 @@ public class Dataset {
     private final DatasetReader reader;
     private final LRUCache<String, double[]> eigenvectorCache;
     private final LRUCache<String, NormalizationVector> normalizationVectorCache;
-    private final Map<String, NormalizationVector> normalizationsVectorsOnlySavedInRAMCache;
-    private final Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap = new HashMap<>();
+    private final Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap;
     private Map<String, ExpectedValueFunction> expectedValueFunctionMap;
     String genomeId;
     String restrictionEnzyme = null;
@@ -66,8 +65,21 @@ public class Dataset {
         this.reader = reader;
         eigenvectorCache = new LRUCache<>(25);
         normalizationVectorCache = new LRUCache<>(25);
-        normalizationsVectorsOnlySavedInRAMCache = new HashMap<>();
         normalizationTypes = new ArrayList<>();
+        correctedExpectedValueFunctionMap = new HashMap<>();
+    }
+
+    public void clearCache() {
+        for (Matrix matrix : matrices.values()) {
+            try {
+                matrix.clearCache();
+            } catch (Exception e) {
+            }
+        }
+        eigenvectorCache.clear();
+        normalizationVectorCache.clear();
+        normalizationTypes.clear();
+        correctedExpectedValueFunctionMap.clear();
     }
 
     public Matrix getMatrix(Chromosome chr1, Chromosome chr2) {
@@ -409,10 +421,6 @@ public class Dataset {
     public NormalizationVector getNormalizationVector(int chrIdx, HiCZoom zoom, NormalizationType type) {
 
         String key = NormalizationVector.getKey(type, chrIdx, zoom.getUnit().toString(), zoom.getBinSize());
-
-        if (normalizationsVectorsOnlySavedInRAMCache.containsKey(key)) {
-            return normalizationsVectorsOnlySavedInRAMCache.get(key);
-        }
 
         if (type.equals(NormalizationHandler.NONE)) {
             return null;

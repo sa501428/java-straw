@@ -26,7 +26,7 @@ package javastraw.reader.pearsons;
 
 import javastraw.matrices.BasicMatrix;
 import javastraw.matrices.InMemoryMatrix;
-import javastraw.tools.ParallelizedJuicerTools;
+import javastraw.tools.ParallelizationTools;
 
 import java.util.BitSet;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -53,7 +53,7 @@ public class Pearsons {
 
         // Set diagonal to 1, set centromere to NaN
         AtomicInteger dCounter = new AtomicInteger(0);
-        ParallelizedJuicerTools.launchParallelizedCode(() -> {
+        ParallelizationTools.launchParallelizedCode(() -> {
             int i = dCounter.getAndIncrement();
             while (i < dim) {
                 if (bitSet.get(i)) {
@@ -95,7 +95,7 @@ public class Pearsons {
     private static void inPlaceParallelSubtractRowMeans(double[][] matrix, int dim, BitSet bitSet) {
         double[] rowMeans = new double[dim];
         AtomicInteger index = new AtomicInteger(0);
-        ParallelizedJuicerTools.launchParallelizedCode(() -> {
+        ParallelizationTools.launchParallelizedCode(() -> {
             int i = index.getAndIncrement();
             while (i < dim) {
                 if (bitSet.get(i)) {
@@ -106,7 +106,7 @@ public class Pearsons {
         });
 
         AtomicInteger index2 = new AtomicInteger(0);
-        ParallelizedJuicerTools.launchParallelizedCode(() -> {
+        ParallelizationTools.launchParallelizedCode(() -> {
             int i = index2.getAndIncrement();
             while (i < dim) {
                 if (bitSet.get(i)) {

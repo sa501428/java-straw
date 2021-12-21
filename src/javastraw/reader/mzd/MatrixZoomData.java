@@ -35,7 +35,7 @@ import javastraw.reader.depth.LogDepth;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.iterators.IteratorContainer;
-import javastraw.reader.pearsons.Pearsons;
+import javastraw.reader.pearsons.PearsonsManager;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.MatrixType;
 import javastraw.reader.type.NormalizationType;
@@ -67,6 +67,7 @@ public class MatrixZoomData {
     private IteratorContainer iteratorContainer = null;
     private boolean useCache = true;
     private final Map<NormalizationType, BasicMatrix> pearsonsMap;
+    private final Map<String, double[]> eigenvectorMap;
 
 
     /**
@@ -113,6 +114,7 @@ public class MatrixZoomData {
             correctedBinCount = blockBinCount;
         }
         pearsonsMap = new HashMap<>();
+        eigenvectorMap = new HashMap<>();
     }
 
     public void setUseCache(boolean useCache) {
@@ -151,7 +153,7 @@ public class MatrixZoomData {
         return zoom;
     }
 
-    private int getBlockColumnCount() {
+    public int getBlockColumnCount() {
         return blockColumnCount;
     }
 
@@ -727,6 +729,7 @@ public class MatrixZoomData {
     public void clearCache() {
         blockCache.clear();
         pearsonsMap.clear();
+        eigenvectorMap.clear();
     }
 
     public long getNumberOfContactRecords() {
@@ -745,56 +748,52 @@ public class MatrixZoomData {
     }
 
     public BasicMatrix getPearsons(ExpectedValueFunction df) {
-        boolean readPearsons = false; // check if were able to read in
-        // try to get from local cache
+        if (chr1.getIndex() != chr2.getIndex()) {
+            throw new RuntimeException("Cannot compute pearsons for non-diagonal matrices");
+        }
+
         BasicMatrix pearsons = pearsonsMap.get(df.getNormalizationType());
         if (pearsons != null) {
             return pearsons;
         }
-        // we weren't able to read in the Pearsons. check that the resolution is low enough to calculate
-        pearsons = computePearsons(df);
+
+        pearsons = PearsonsManager.computePearsons(df, getNewContactRecordIterator(), chr1, zoom.getBinSize());
         pearsonsMap.put(df.getNormalizationType(), pearsons);
         return pearsonsMap.get(df.getNormalizationType());
     }
 
-    private BasicMatrix computePearsons(ExpectedValueFunction df) {
-        if (chr1 != chr2) {
-            throw new RuntimeException("Cannot compute pearsons for non-diagonal matrices");
+    public float getPearsonValue(int binX, int binY, NormalizationType type) {
+        BasicMatrix pearsons = pearsonsMap.get(type);
+        if (pearsons != null) {
+            return pearsons.getEntry(binX, binY);
+        } else {
+            return 0;
         }
-
-        int dim = (int) (chr1.getLength() / zoom.getBinSize()) + 1;
-
-        // Compute O/E column vectors
-        double[][] oeMatrix = new double[dim][dim];
-        BitSet bitSet = new BitSet(dim);
-        populateOEMatrixAndBitset(oeMatrix, bitSet, df);
-
-        BasicMatrix pearsons;
-        pearsons = Pearsons.computeParallelizedPearsons(oeMatrix, dim, bitSet);
-
-        pearsonsMap.put(df.getNormalizationType(), pearsons);
-        return pearsons;
     }
 
-    private void populateOEMatrixAndBitset(double[][] oeMatrix, BitSet bitSet, ExpectedValueFunction df) {
-        Iterator<ContactRecord> iterator = getNewContactRecordIterator();
-        while (iterator.hasNext()) {
-            ContactRecord record = iterator.next();
-            float counts = record.getCounts();
-            if (Float.isNaN(counts)) continue;
-
-            int i = record.getBinX();
-            int j = record.getBinY();
-            int dist = Math.abs(i - j);
-
-            double expected = df.getExpectedValue(chr1.getIndex(), dist);
-            double oeValue = counts / expected;
-
-            oeMatrix[i][j] = oeValue;
-            oeMatrix[j][i] = oeValue;
-
-            bitSet.set(i);
-            bitSet.set(j);
+    public double[] getEigenvector(ExpectedValueFunction df, int which) {
+        if (chr1.getIndex() != chr2.getIndex()) {
+            throw new RuntimeException("Cannot compute eigenvector for non-diagonal matrices");
         }
+
+        String eigKey = getEigenvectorKey(df.getNormalizationType(), which);
+
+        double[] eig = eigenvectorMap.get(eigKey);
+        if (eig != null) {
+            return eig;
+        }
+
+        BasicMatrix pearsons = getPearsons(df);
+        if (pearsons == null) {
+            return null;
+        }
+
+        eig = PearsonsManager.computeEigenvector(pearsons, which);
+        eigenvectorMap.put(eigKey, eig);
+        return eigenvectorMap.get(eigKey);
+    }
+
+    private String getEigenvectorKey(NormalizationType normalizationType, int which) {
+        return normalizationType.getLabel() + "_" + which;
     }
 }

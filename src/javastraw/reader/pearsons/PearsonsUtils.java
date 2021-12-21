@@ -31,7 +31,7 @@ import javastraw.tools.ParallelizationTools;
 import java.util.BitSet;
 import java.util.concurrent.atomic.AtomicInteger;
 
-public class Pearsons {
+public class PearsonsUtils {
 
     private static double getVectorMean(double[] vector) {
         double sum = 0;

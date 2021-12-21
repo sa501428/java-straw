@@ -25,8 +25,8 @@
 package javastraw.tools;
 
 import javastraw.reader.block.ContactRecord;
-import org.apache.commons.math.linear.Array2DRowRealMatrix;
-import org.apache.commons.math.linear.RealMatrix;
+import org.apache.commons.math3.linear.Array2DRowRealMatrix;
+import org.apache.commons.math3.linear.RealMatrix;
 import org.apache.commons.math3.stat.descriptive.rank.Median;
 import org.jetbrains.bio.npy.NpyFile;
 

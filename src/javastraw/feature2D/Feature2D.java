@@ -47,6 +47,7 @@ public class Feature2D implements Comparable<Feature2D> {
     protected long end2;
     protected Feature2D reflection = null;
     protected Color color;
+    protected boolean status = false;
 
     public Feature2D(FeatureType featureType, String chr1, long start1, long end1, String chr2, long start2, long end2, Color c,
                      Map<String, String> attributes) {
@@ -142,11 +143,18 @@ public class Feature2D implements Comparable<Feature2D> {
         return color;
     }
 
-
     public void setColor(Color color) {
         this.color = color;
         if (reflection != null)
             reflection.color = color;
+    }
+
+    public boolean getStatus() {
+        return status;
+    }
+
+    public void setStatus(boolean status) {
+        this.status = status;
     }
 
     public String getOutputFileHeader() {

@@ -54,7 +54,7 @@ public class Dataset {
     private final DatasetReader reader;
     private final LRUCache<String, double[]> eigenvectorCache;
     private final LRUCache<String, NormalizationVector> normalizationVectorCache;
-    private final Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap;
+    private Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap;
     private Map<String, ExpectedValueFunction> expectedValueFunctionMap;
     String genomeId;
     String restrictionEnzyme = null;
@@ -72,7 +72,6 @@ public class Dataset {
         eigenvectorCache = new LRUCache<>(25);
         normalizationVectorCache = new LRUCache<>(25);
         normalizationTypes = new ArrayList<>();
-        correctedExpectedValueFunctionMap = new HashMap<>();
     }
 
     public void clearCache() {
@@ -85,7 +84,6 @@ public class Dataset {
         eigenvectorCache.clear();
         normalizationVectorCache.clear();
         normalizationTypes.clear();
-        correctedExpectedValueFunctionMap.clear();
     }
 
     public Matrix getMatrix(Chromosome chr1, Chromosome chr2) {
@@ -193,6 +191,8 @@ public class Dataset {
     }
 
     private ExpectedValueFunction getCorrectedVersionOfExpectedVector(HiCZoom zoom, NormalizationType type) {
+        if (correctedExpectedValueFunctionMap == null || expectedValueFunctionMap == null || zoom == null || type == null)
+            return null;
         String key = ExpectedValueFunctionImpl.getKey(zoom, type);
         if (!correctedExpectedValueFunctionMap.containsKey(key)) {
             ExpectedValueFunction corrected = expectedValueFunctionMap.get(key).getCorrectedVersion();
@@ -217,6 +217,7 @@ public class Dataset {
 
     public void setExpectedValueFunctionMap(Map<String, ExpectedValueFunction> df) {
         this.expectedValueFunctionMap = df;
+        correctedExpectedValueFunctionMap = new HashMap<>();
     }
 
     public ChromosomeHandler getChromosomeHandler() {

@@ -37,17 +37,16 @@ public class Feature2D implements Comparable<Feature2D> {
     public static final String genericHeader = "#chr1\tx1\tx2\tchr2\ty1\ty2\tname\tscore\tstrand1\tstrand2\tcolor";
     private static final String BEDPE_SPACER = "\t.\t.\t.\t.";
     public static int tolerance = 0;
-    final FeatureType featureType;
-    final Map<String, String> attributes;
-    final String chr1;
-    final String chr2;
-    final long start1;
-    final long start2;
-    long end1;
-    long end2;
-    private Feature2D reflection = null;
-    private Color color;
-    private boolean test = false;
+    protected final FeatureType featureType;
+    protected final Map<String, String> attributes;
+    protected final String chr1;
+    protected final String chr2;
+    protected final long start1;
+    protected final long start2;
+    protected long end1;
+    protected long end2;
+    protected Feature2D reflection = null;
+    protected Color color;
 
     public Feature2D(FeatureType featureType, String chr1, long start1, long end1, String chr2, long start2, long end2, Color c,
                      Map<String, String> attributes) {
@@ -70,7 +69,7 @@ public class Feature2D implements Comparable<Feature2D> {
         return this.featureType;
     }
 
-    private String getFeatureName() {
+    public String getFeatureName() {
         switch (featureType) {
             case PEAK:
                 return "Peak";
@@ -135,7 +134,7 @@ public class Feature2D implements Comparable<Feature2D> {
         return midPoint(start2, end2);
     }
 
-    private long midPoint(long start, long end) {
+    public long midPoint(long start, long end) {
         return (long) (start + (end - start) / 2.0);
     }
 
@@ -163,11 +162,11 @@ public class Feature2D implements Comparable<Feature2D> {
         return output.toString();
     }
 
-    private String simpleString() {
+    public String simpleString() {
         return chr1 + "\t" + start1 + "\t" + end1 + "\t" + chr2 + "\t" + start2 + "\t" + end2;
     }
 
-    private String justColorString() {
+    public String justColorString() {
         return "\t" + color.getRed() + "," + color.getGreen() + "," + color.getBlue();
     }
 
@@ -323,10 +322,6 @@ public class Feature2D implements Comparable<Feature2D> {
     @Override
     public int hashCode() {
         return Objects.hash(chr1, end1, start1, chr2, end2, start2);
-    }
-
-    public void doTest() {
-        test = true;
     }
 
     public void clearAttributes() {

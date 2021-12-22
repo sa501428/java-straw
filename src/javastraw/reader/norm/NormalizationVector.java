@@ -31,11 +31,11 @@ import javastraw.reader.type.NormalizationType;
 
 public class NormalizationVector {
 
-    private final NormalizationType type;
-    private final int chrIdx;
-    private final HiCZoom.HiCUnit unit;
-    private final int resolution;
-    private final ListOfDoubleArrays data;
+    protected final NormalizationType type;
+    protected final int chrIdx;
+    protected final HiCZoom.HiCUnit unit;
+    protected final int resolution;
+    protected final ListOfDoubleArrays data;
 
     public NormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int resolution, ListOfDoubleArrays data) {
         this.type = type;

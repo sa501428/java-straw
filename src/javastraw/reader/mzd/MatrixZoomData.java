@@ -25,12 +25,13 @@
 
 package javastraw.reader.mzd;
 
-import htsjdk.tribble.util.LittleEndianOutputStream;
 import javastraw.matrices.BasicMatrix;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.block.Block;
+import javastraw.reader.block.BlockModifier;
 import javastraw.reader.block.ContactRecord;
+import javastraw.reader.block.IdentityModifier;
 import javastraw.reader.depth.LogDepth;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.expected.ExpectedValueFunction;
@@ -39,13 +40,11 @@ import javastraw.reader.iterators.ListOfListGenerator;
 import javastraw.reader.iterators.ZDIteratorContainer;
 import javastraw.reader.pearsons.PearsonsManager;
 import javastraw.reader.type.HiCZoom;
-import javastraw.reader.type.MatrixType;
 import javastraw.reader.type.NormalizationType;
 import javastraw.tools.ParallelizationTools;
 import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -72,20 +71,8 @@ public class MatrixZoomData {
     private final Map<String, double[]> eigenvectorMap;
     public static boolean useIteratorDontPutAllInRAM = false;
     public static boolean shouldCheckRAMUsage = false;
+    private final BlockModifier identity = new IdentityModifier();
 
-
-    /**
-     * Constructor, sets the grid axes.  Called when read from file.
-     *
-     * @param chr1             Chromosome 1
-     * @param chr2             Chromosome 2
-     * @param zoom             Zoom (bin size and BP or FRAG)
-     * @param blockBinCount    Number of bins divided by number of columns (around 1000)
-     * @param blockColumnCount Number of bins divided by 1000 (BLOCK_SIZE)
-     * @param chr1Sites        Used for looking up fragment
-     * @param chr2Sites        Used for looking up fragment
-     * @param reader           Pointer to file reader
-     */
     public MatrixZoomData(Chromosome chr1, Chromosome chr2, HiCZoom zoom, int blockBinCount, int blockColumnCount,
                           int[] chr1Sites, int[] chr2Sites, DatasetReader reader) {
         this.chr1 = chr1;
@@ -181,66 +168,24 @@ public class MatrixZoomData {
         return getKey() + "_" + block.getNumber() + "_" + block.getUniqueRegionID();
     }
 
-    private String getBlockKey(int blockNumber, NormalizationType no, int chr1, int chr2) {
-        return getKey(chr1, chr2) + "_" + blockNumber + "_" + no;
+    public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2,
+                                                      final NormalizationType no, boolean isImportant,
+                                                      boolean fillUnderDiagonal) {
+        return getNormalizedBlocksOverlapping(binX1, binY1, binX2, binY2,
+                no, isImportant, fillUnderDiagonal, identity);
     }
 
-    /**
-     * Return the blocks of normalized, observed values overlapping the rectangular region specified.
-     * The units are "bins"
-     *
-     * @param binY1       leftmost position in "bins"
-     * @param binX2       rightmost position in "bins"
-     * @param binY2       bottom position in "bins"
-     * @param no          normalization type
-     * @param isImportant used for debugging
-     * @return List of overlapping blocks, normalized
-     */
-    public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2, final NormalizationType no,
-                                                      boolean isImportant, boolean fillUnderDiagonal) {
-
+    public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2,
+                                                      final NormalizationType no, boolean isImportant,
+                                                      boolean fillUnderDiagonal, BlockModifier modifier) {
         final List<Block> blockList = Collections.synchronizedList(new ArrayList<>());
         if (reader.getVersion() > 8 && isIntra) {
-            return addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no);
+            return addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, modifier);
         } else {
-            return addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, fillUnderDiagonal);
+            return addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, fillUnderDiagonal, modifier);
         }
     }
 
-    /**
-     * // for reference
-     * public int getBlockNumberVersion9(int binI, int binJ) {
-     * //int numberOfBlocksOnDiagonal = numberOfBinsInThisIntraMatrixAtResolution / blockSizeInBinCount + 1;
-     * // assuming number of blocks on diagonal is blockClolumnSize
-     * int depth = v9Depth.getDepth(binI, binJ);
-     * int positionAlongDiagonal = ((binI + binJ) / 2 / blockBinCount);
-     * return getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth);
-     * }
-     * <p>
-     * public int[] getBlockBoundsFromNumberVersion9Up(int blockNumber) {
-     * int positionAlongDiagonal = blockNumber % blockColumnCount;
-     * int depth = blockNumber / blockColumnCount;
-     * int avgPosition1 = positionAlongDiagonal * blockBinCount;
-     * int avgPosition2 = (positionAlongDiagonal + 1) * blockBinCount;
-     * double difference1 = (Math.pow(2, depth) - 1) * blockBinCount * Math.sqrt(2);
-     * double difference2 = (Math.pow(2, depth + 1) - 1) * blockBinCount * Math.sqrt(2);
-     * int c1 = avgPosition1 + (int) difference1 / 2 - 1;
-     * int c2 = avgPosition2 + (int) difference2 / 2 + 1;
-     * int r1 = avgPosition1 - (int) difference2 / 2 - 1;
-     * int r2 = avgPosition2 - (int) difference1 / 2 + 1;
-     * return new int[]{c1, c2, r1, r2};
-     * }
-     * <p>
-     * public int[] getBlockBoundsFromNumberVersion8Below(int blockNumber) {
-     * int c = (blockNumber % blockColumnCount);
-     * int r = blockNumber / blockColumnCount;
-     * int c1 = c * blockBinCount;
-     * int c2 = c1 + blockBinCount - 1;
-     * int r1 = r * blockBinCount;
-     * int r2 = r1 + blockBinCount - 1;
-     * return new int[]{c1, c2, r1, r2};
-     * }
-     */
     public int getBlockNumberVersion9FromPADAndDepth(int positionAlongDiagonal, int depth) {
         return depth * blockColumnCount + positionAlongDiagonal;
     }
@@ -258,7 +203,7 @@ public class MatrixZoomData {
     }
 
     private List<Block> addNormalizedBlocksToListV9(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                    final NormalizationType norm) {
+                                                    final NormalizationType norm, BlockModifier modifier) {
 
         Set<Integer> blocksToLoad = new HashSet<>();
 
@@ -283,7 +228,7 @@ public class MatrixZoomData {
             }
         }
 
-        actuallyLoadGivenBlocks(blockList, blocksToLoad, norm);
+        actuallyLoadGivenBlocks(blockList, blocksToLoad, norm, modifier);
 
         return new ArrayList<>(new HashSet<>(blockList));
     }
@@ -310,7 +255,7 @@ public class MatrixZoomData {
      * @return List of overlapping blocks, normalized
      */
     private List<Block> addNormalizedBlocksToList(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                  final NormalizationType norm, boolean getBelowDiagonal) {
+                                                  final NormalizationType norm, boolean getBelowDiagonal, BlockModifier modifier) {
 
         Set<Integer> blocksToLoad = new HashSet<>();
 
@@ -334,68 +279,33 @@ public class MatrixZoomData {
             }
         }
 
-        actuallyLoadGivenBlocks(blockList, blocksToLoad, norm);
+        actuallyLoadGivenBlocks(blockList, blocksToLoad, norm, modifier);
 
-        return new ArrayList<>(new HashSet<>(blockList));
-    }
-
-    private List<Block> addNormalizedBlocksToList(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                  final NormalizationType no, int chr1, int chr2) {
-
-        Set<Integer> blocksToLoad = new HashSet<>();
-
-        // for V8 - these will always be ints
-        // have to do this regardless (just in case)
-        int col1 = binX1 / blockBinCount;
-        int row1 = binY1 / blockBinCount;
-        int col2 = binX2 / blockBinCount;
-        int row2 = binY2 / blockBinCount;
-
-        for (int r = row1; r <= row2; r++) {
-            for (int c = col1; c <= col2; c++) {
-                populateBlocksToLoad(r, c, no, blockList, blocksToLoad);
-            }
-        }
-
-        actuallyLoadGivenBlocks(blockList, blocksToLoad, no, chr1, chr2);
-//        System.out.println("I am block size: " + blockList.size());
-//        System.out.println("I am first block: " + blockList.get(0).getNumber());
         return new ArrayList<>(new HashSet<>(blockList));
     }
 
     private void actuallyLoadGivenBlocks(final List<Block> blockList, Set<Integer> blocksToLoad,
-                                         final NormalizationType no) {
+                                         final NormalizationType no, BlockModifier modifier) {
         final AtomicInteger errorCounter = new AtomicInteger();
 
         ExecutorService service = Executors.newFixedThreadPool(200);
         for (final int blockNumber : blocksToLoad) {
             String key = getBlockKey(blockNumber, no);
-            readBlockUpdateListAndCache(blockNumber, reader, no, blockList, key, errorCounter, service);
-        }
-        ParallelizationTools.shutDownServiceAndWait(service, errorCounter);
-    }
-
-    private void actuallyLoadGivenBlocks(final List<Block> blockList, Set<Integer> blocksToLoad,
-                                         final NormalizationType no, final int chr1Id, final int chr2Id) {
-        final AtomicInteger errorCounter = new AtomicInteger();
-        ExecutorService service = Executors.newFixedThreadPool(200);
-        for (final int blockNumber : blocksToLoad) {
-            String key = getBlockKey(blockNumber, no, chr1Id, chr2Id);
-            readBlockUpdateListAndCache(blockNumber, reader, no, blockList, key, errorCounter, service);
+            readBlockUpdateListAndCache(blockNumber, reader, no, blockList, key, errorCounter, service, modifier);
         }
         ParallelizationTools.shutDownServiceAndWait(service, errorCounter);
     }
 
     private void readBlockUpdateListAndCache(int blockNumber, DatasetReader reader, NormalizationType no,
                                              List<Block> blockList, String key, final AtomicInteger errorCounter,
-                                             ExecutorService service) {
+                                             ExecutorService service, BlockModifier modifier) {
         Runnable loader = () -> {
             try {
                 Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, no);
                 if (b == null) {
                     b = new Block(blockNumber, key);
                 }
-
+                b = modifier.modify(b);
                 if (useCache) {
                     blockCache.put(key, b);
                 }
@@ -429,8 +339,6 @@ public class MatrixZoomData {
     /**
      * For a specified region, select the block numbers corresponding to it
      *
-     * @param regionIndices
-     * @return
      */
     List<Integer> getBlockNumbersForRegionFromGenomePosition(long[] regionIndices) {
         int resolution = zoom.getBinSize();
@@ -472,247 +380,6 @@ public class MatrixZoomData {
         List<Integer> blocksToIterateOver = new ArrayList<>(blocksSet);
         Collections.sort(blocksToIterateOver);
         return blocksToIterateOver;
-    }
-
-
-    public void dump(PrintWriter printWriter, LittleEndianOutputStream les, NormalizationType norm, MatrixType matrixType,
-                     boolean useRegionIndices, long[] regionIndices, ExpectedValueFunction df, boolean dense) throws IOException {
-
-        // determine which output will be used
-        if (printWriter == null && les == null) {
-            printWriter = new PrintWriter(System.out);
-        }
-        boolean usePrintWriter = printWriter != null && les == null;
-        boolean isIntraChromosomal = chr1.getIndex() == chr2.getIndex();
-
-        // Get the block index keys, and sort
-        List<Integer> blocksToIterateOver;
-        if (useRegionIndices) {
-            blocksToIterateOver = getBlockNumbersForRegionFromGenomePosition(regionIndices);
-        } else {
-            blocksToIterateOver = reader.getBlockNumbers(this);
-            Collections.sort(blocksToIterateOver);
-        }
-
-        if (!dense) {
-            for (Integer blockNumber : blocksToIterateOver) {
-                Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, norm);
-                if (b != null) {
-                    for (ContactRecord rec : b.getContactRecords()) {
-                        float counts = rec.getCounts();
-                        int x = rec.getBinX();
-                        int y = rec.getBinY();
-                        int xActual = x * zoom.getBinSize();
-                        int yActual = y * zoom.getBinSize();
-                        float oeVal = 0f;
-                        if (matrixType == MatrixType.OE) {
-                            double expected = 0;
-                            if (chr1 == chr2) {
-                                if (df != null) {
-                                    int dist = Math.abs(x - y);
-                                    expected = df.getExpectedValue(chr1.getIndex(), dist);
-                                }
-                            } else {
-                                expected = (averageCount > 0 ? averageCount : 1);
-                            }
-
-                            double observed = rec.getCounts(); // Observed is already normalized
-                            oeVal = (float) (observed / expected);
-                        }
-                        if (!useRegionIndices || // i.e. use full matrix
-                                // or check regions that overlap with upper left
-                                (xActual >= regionIndices[0] && xActual <= regionIndices[1] &&
-                                        yActual >= regionIndices[2] && yActual <= regionIndices[3]) ||
-                                // or check regions that overlap with lower left
-                                (isIntraChromosomal && yActual >= regionIndices[0] && yActual <= regionIndices[1] &&
-                                        xActual >= regionIndices[2] && xActual <= regionIndices[3])) {
-                            // but leave in upper right triangle coordinates
-                            if (usePrintWriter) {
-                                if (matrixType == MatrixType.OBSERVED) {
-                                    printWriter.println(xActual + "\t" + yActual + "\t" + counts);
-                                } else if (matrixType == MatrixType.OE) {
-                                    printWriter.println(xActual + "\t" + yActual + "\t" + oeVal);
-                                }
-                            } else {
-                                // TODO I suspect this is wrong - should be writing xActual - but this is for binary dumping and we never use it
-                                if (matrixType == MatrixType.OBSERVED) {
-                                    les.writeInt(x);
-                                    les.writeInt(y);
-                                    les.writeFloat(counts);
-                                } else if (matrixType == MatrixType.OE) {
-                                    les.writeInt(x);
-                                    les.writeInt(y);
-                                    les.writeFloat(oeVal);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if (usePrintWriter) {
-                printWriter.close();
-            }
-            else {
-                les.close();
-            }
-        }
-        else {
-            int maxX = 0;
-            int maxY = 0;
-            for (Integer blockNumber : blocksToIterateOver) {
-                Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, norm);
-                if (b != null) {
-                    for (ContactRecord rec : b.getContactRecords()) {
-                        int x = rec.getBinX();
-                        int y = rec.getBinY();
-                        if (maxX < x) maxX = x;
-                        if (maxY < y) maxY = y;
-                    }
-                }
-            }
-            if (isIntraChromosomal) {
-                if (maxX < maxY) {
-                    maxX = maxY;
-                } else {
-                    maxY = maxX;
-                }
-            }
-
-            maxX++;
-            maxY++;
-            float[][] matrix = new float[maxX][maxY];  // auto initialized to 0
-
-            for (Integer blockNumber : blocksToIterateOver) {
-                Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, norm);
-                if (b != null) {
-                    for (ContactRecord rec : b.getContactRecords()) {
-                        float counts = rec.getCounts();
-                        int x = rec.getBinX();
-                        int y = rec.getBinY();
-
-                        int xActual = x * zoom.getBinSize();
-                        int yActual = y * zoom.getBinSize();
-                        float oeVal = 0f;
-                        if (matrixType == MatrixType.OE) {
-                            int dist = Math.abs(x - y);
-                            double expected = 0;
-                            try {
-                                expected = df.getExpectedValue(chr1.getIndex(), dist);
-                            } catch (Exception e) {
-                                e.printStackTrace();  //To change body of catch statement use File | Settings | File Templates.
-                            }
-                            double observed = rec.getCounts(); // Observed is already normalized
-                            oeVal = (float) (observed / expected);
-                        }
-                        if (!useRegionIndices || // i.e. use full matrix
-                                // or check regions that overlap with upper left
-                                (xActual >= regionIndices[0] && xActual <= regionIndices[1] &&
-                                        yActual >= regionIndices[2] && yActual <= regionIndices[3]) ||
-                                // or check regions that overlap with lower left
-                                (isIntraChromosomal && yActual >= regionIndices[0] && yActual <= regionIndices[1] &&
-                                        xActual >= regionIndices[2] && xActual <= regionIndices[3])) {
-
-                            if (matrixType == MatrixType.OBSERVED) {
-                                matrix[x][y] = counts;
-                                if (isIntraChromosomal) {
-                                    matrix[y][x] = counts;
-                                }
-                                // printWriter.println(xActual + "\t" + yActual + "\t" + counts);
-                            } else if (matrixType == MatrixType.OE) {
-                                matrix[x][y] = oeVal;
-                                if (isIntraChromosomal) {
-                                    matrix[y][x] = oeVal;
-                                }
-                                // printWriter.println(xActual + "\t" + yActual + "\t" + oeVal);
-                            }
-                        }
-                    }
-                }
-            }
-            if (usePrintWriter) {
-                for (int i = 0; i < maxX; i++) {
-                    for (int j = 0; j < maxY; j++) {
-                        printWriter.print(matrix[i][j] + "\t");
-                    }
-                    printWriter.println();
-                }
-            } else {
-                for (int i = 0; i < maxX; i++) {
-                    for (int j = 0; j < maxY; j++) {
-                        les.writeFloat(matrix[i][j]);
-
-                    }
-
-                }
-            }
-
-            if (usePrintWriter) {
-                printWriter.close();
-            } else {
-                les.close();
-            }
-        }
-    }
-
-    public void dump1DTrackFromCrossHairAsWig(PrintWriter printWriter, long binStartPosition,
-                                              boolean isIntraChromosomal, long[] regionBinIndices,
-                                              NormalizationType norm, MatrixType matrixType) {
-
-        if (!MatrixType.isObservedOrControl(matrixType)) {
-            System.out.println("This feature is only available for Observed or Control views");
-            return;
-        }
-
-        int binCounter = 0;
-
-        // Get the block index keys, and sort
-        List<Integer> blocksToIterateOver = getBlockNumbersForRegionFromBinPosition(regionBinIndices);
-        Collections.sort(blocksToIterateOver);
-
-        for (Integer blockNumber : blocksToIterateOver) {
-            Block b = null;
-            try {
-                b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, norm);
-            } catch (Exception e) {
-                System.err.println("Skipping block " + blockNumber);
-            }
-            if (b != null) {
-                for (ContactRecord rec : b.getContactRecords()) {
-                    float counts = rec.getCounts();
-                    int x = rec.getBinX();
-                    int y = rec.getBinY();
-
-                    if (    //check regions that overlap with upper left
-                            (x >= regionBinIndices[0] && x <= regionBinIndices[1] &&
-                                    y >= regionBinIndices[2] && y <= regionBinIndices[3]) ||
-                                    // or check regions that overlap with lower left
-                                    (isIntraChromosomal && x >= regionBinIndices[2] && x <= regionBinIndices[3] &&
-                                            y >= regionBinIndices[0] && y <= regionBinIndices[1])) {
-                        // but leave in upper right triangle coordinates
-
-                        if (x == binStartPosition) {
-                            while (binCounter < y) {
-                                printWriter.println("0");
-                                binCounter++;
-                            }
-                        } else if (y == binStartPosition) {
-                            while (binCounter < x) {
-                                printWriter.println("0");
-                                binCounter++;
-                            }
-                        } else {
-                            System.err.println("Something went wrong while generating 1D track");
-                            System.err.println("Improper input was likely provided");
-                        }
-
-                        printWriter.println(counts);
-                        binCounter++;
-
-                    }
-                }
-            }
-        }
     }
 
 

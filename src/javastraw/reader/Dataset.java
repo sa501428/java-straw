@@ -54,11 +54,11 @@ public class Dataset {
     private final DatasetReader reader;
     private final LRUCache<String, double[]> eigenvectorCache;
     private final LRUCache<String, NormalizationVector> normalizationVectorCache;
-    private Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap;
-    private Map<String, ExpectedValueFunction> expectedValueFunctionMap;
-    String genomeId;
-    String restrictionEnzyme = null;
-    List<HiCZoom> bpZooms, dynamicZooms, fragZooms;
+    private final String restrictionEnzyme = null;
+    protected String genomeId;
+    protected List<HiCZoom> bpZooms, dynamicZooms, fragZooms;
+    private Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap = null;
+    private Map<String, ExpectedValueFunction> expectedValueFunctionMap = null;
     private int v9DepthBase = 0;
     private List<Integer> bpZoomResolutions;
     private Map<String, String> attributes;
@@ -191,12 +191,15 @@ public class Dataset {
     }
 
     private ExpectedValueFunction getCorrectedVersionOfExpectedVector(HiCZoom zoom, NormalizationType type) {
-        if (correctedExpectedValueFunctionMap == null || expectedValueFunctionMap == null || zoom == null || type == null)
+        if (correctedExpectedValueFunctionMap == null || expectedValueFunctionMap == null
+                || zoom == null || type == null) {
             return null;
+        }
         String key = ExpectedValueFunctionImpl.getKey(zoom, type);
         if (!correctedExpectedValueFunctionMap.containsKey(key)) {
-            ExpectedValueFunction corrected = expectedValueFunctionMap.get(key).getCorrectedVersion();
-            correctedExpectedValueFunctionMap.put(key, corrected);
+            ExpectedValueFunction evf = expectedValueFunctionMap.get(key);
+            if (evf == null) return null;
+            correctedExpectedValueFunctionMap.put(key, evf.getCorrectedVersion());
         }
         return correctedExpectedValueFunctionMap.get(key);
     }

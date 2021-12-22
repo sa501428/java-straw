@@ -156,7 +156,7 @@ public class MatrixZoomData {
         return chr1.getName() + "_" + chr2.getName() + "_" + zoom.getKey();
     }
 
-    private String getKey(int chr1, int chr2) {
+    public String getKey(int chr1, int chr2) {
         return chr1 + "_" + chr2 + "_" + zoom.getKey();
     }
 
@@ -190,7 +190,7 @@ public class MatrixZoomData {
         return depth * blockColumnCount + positionAlongDiagonal;
     }
 
-    private void populateBlocksToLoadV9(int positionAlongDiagonal, int depth, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
+    protected void populateBlocksToLoadV9(int positionAlongDiagonal, int depth, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
         int blockNumber = getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth);
         String key = getBlockKey(blockNumber, no);
         Block b;
@@ -202,8 +202,8 @@ public class MatrixZoomData {
         }
     }
 
-    private List<Block> addNormalizedBlocksToListV9(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                    final NormalizationType norm, BlockModifier modifier) {
+    protected List<Block> addNormalizedBlocksToListV9(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
+                                                      final NormalizationType norm, BlockModifier modifier) {
 
         Set<Integer> blocksToLoad = new HashSet<>();
 
@@ -233,7 +233,7 @@ public class MatrixZoomData {
         return new ArrayList<>(new HashSet<>(blockList));
     }
 
-    private void populateBlocksToLoad(int r, int c, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
+    protected void populateBlocksToLoad(int r, int c, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
         int blockNumber = r * getBlockColumnCount() + c;
         String key = getBlockKey(blockNumber, no);
         Block b;
@@ -254,8 +254,8 @@ public class MatrixZoomData {
      * @param norm  normalization type
      * @return List of overlapping blocks, normalized
      */
-    private List<Block> addNormalizedBlocksToList(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                  final NormalizationType norm, boolean getBelowDiagonal, BlockModifier modifier) {
+    protected List<Block> addNormalizedBlocksToList(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
+                                                    final NormalizationType norm, boolean getBelowDiagonal, BlockModifier modifier) {
 
         Set<Integer> blocksToLoad = new HashSet<>();
 
@@ -284,8 +284,8 @@ public class MatrixZoomData {
         return new ArrayList<>(new HashSet<>(blockList));
     }
 
-    private void actuallyLoadGivenBlocks(final List<Block> blockList, Set<Integer> blocksToLoad,
-                                         final NormalizationType no, BlockModifier modifier) {
+    protected void actuallyLoadGivenBlocks(final List<Block> blockList, Set<Integer> blocksToLoad,
+                                           final NormalizationType no, BlockModifier modifier) {
         final AtomicInteger errorCounter = new AtomicInteger();
 
         ExecutorService service = Executors.newFixedThreadPool(200);
@@ -296,9 +296,9 @@ public class MatrixZoomData {
         ParallelizationTools.shutDownServiceAndWait(service, errorCounter);
     }
 
-    private void readBlockUpdateListAndCache(int blockNumber, DatasetReader reader, NormalizationType no,
-                                             List<Block> blockList, String key, final AtomicInteger errorCounter,
-                                             ExecutorService service, BlockModifier modifier) {
+    protected void readBlockUpdateListAndCache(int blockNumber, DatasetReader reader, NormalizationType no,
+                                               List<Block> blockList, String key, final AtomicInteger errorCounter,
+                                               ExecutorService service, BlockModifier modifier) {
         Runnable loader = () -> {
             try {
                 Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, no);
@@ -338,9 +338,8 @@ public class MatrixZoomData {
 
     /**
      * For a specified region, select the block numbers corresponding to it
-     *
      */
-    List<Integer> getBlockNumbersForRegionFromGenomePosition(long[] regionIndices) {
+    protected List<Integer> getBlockNumbersForRegionFromGenomePosition(long[] regionIndices) {
         int resolution = zoom.getBinSize();
         long[] regionBinIndices = new long[4];
         for (int i = 0; i < regionBinIndices.length; i++) {
@@ -350,7 +349,7 @@ public class MatrixZoomData {
     }
 
     // todo V9 needs a diff method
-    private List<Integer> getBlockNumbersForRegionFromBinPosition(long[] regionIndices) {
+    protected List<Integer> getBlockNumbersForRegionFromBinPosition(long[] regionIndices) {
 
         // cast should be fine - this is for V8
         int col1 = (int) (regionIndices[0] / blockBinCount);
@@ -411,7 +410,7 @@ public class MatrixZoomData {
         return getIteratorContainer().getNumberOfContactRecords();
     }
 
-    private Iterator<ContactRecord> getNewContactRecordIterator() {
+    protected Iterator<ContactRecord> getNewContactRecordIterator() {
         return getIteratorContainer().getNewContactRecordIterator();
         //return new ContactRecordIterator(reader, this, blockCache);
     }
@@ -475,7 +474,7 @@ public class MatrixZoomData {
         return eigenvectorMap.get(eigKey);
     }
 
-    private String getEigenvectorKey(NormalizationType normalizationType, int which) {
+    protected String getEigenvectorKey(NormalizationType normalizationType, int which) {
         return normalizationType.getLabel() + "_" + which;
     }
 }

@@ -1,6 +1,6 @@
 package javastraw.reader.basics;
 
-import javastraw.HiCGlobals;
+import javastraw.StrawGlobals;
 import javastraw.reader.basics.chrom.sizes.ChromosomeSizes;
 
 import java.io.*;
@@ -44,7 +44,7 @@ public class ChromosomeTools {
             chromosomes.add(0, null);   // Index 0 reserved for "whole genome" pseudo-chromosome
 
             Pattern pattern = Pattern.compile("\\s+");
-            BufferedReader reader = new BufferedReader(new InputStreamReader(is), HiCGlobals.bufferSize);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(is), StrawGlobals.bufferSize);
             String nextLine;
             int idx = 1;
 

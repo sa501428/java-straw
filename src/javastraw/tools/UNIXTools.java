@@ -24,7 +24,7 @@
 
 package javastraw.tools;
 
-import javastraw.HiCGlobals;
+import javastraw.StrawGlobals;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -76,7 +76,7 @@ public class UNIXTools {
             Process p = Runtime.getRuntime().exec(command);
             p.waitFor();
             BufferedReader reader =
-                    new BufferedReader(new InputStreamReader(p.getInputStream()), HiCGlobals.bufferSize);
+                    new BufferedReader(new InputStreamReader(p.getInputStream()), StrawGlobals.bufferSize);
 
             String line;
             while ((line = reader.readLine()) != null) {
@@ -102,13 +102,13 @@ public class UNIXTools {
             //p = Runtime.getRuntime().exec(command);
             p = b.redirectErrorStream(true).start();
 
-            if (HiCGlobals.printVerboseComments) {
+            if (StrawGlobals.printVerboseComments) {
                 System.out.println("Command exec " + p.waitFor());
             } else {
                 p.waitFor();
             }
 
-            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()), HiCGlobals.bufferSize);
+            BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()), StrawGlobals.bufferSize);
 
             String line;
             while ((line = reader.readLine()) != null) {

@@ -24,7 +24,7 @@
 
 package javastraw.tools;
 
-import javastraw.HiCGlobals;
+import javastraw.StrawGlobals;
 import javastraw.reader.*;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
@@ -74,9 +74,9 @@ public class HiCFileTools {
     }
 
     private static void verifySupportedHiCFileVersion(int version) throws RuntimeException {
-        if (version < HiCGlobals.minVersion) {
+        if (version < StrawGlobals.minVersion) {
             throw new RuntimeException("This file is version " + version +
-                    ". Only versions " + HiCGlobals.minVersion + " and greater are supported at this time.");
+                    ". Only versions " + StrawGlobals.minVersion + " and greater are supported at this time.");
         }
     }
 
@@ -336,7 +336,7 @@ public class HiCFileTools {
             blocks.addAll(zd.getNormalizedBlocksOverlapping(binXStart, binYStart, binXEnd, binYEnd, normalizationType, false, fillUnderDiagonal));
         } catch (Exception e) {
             triggerNormError(normalizationType);
-            if (HiCGlobals.printVerboseComments) {
+            if (StrawGlobals.printVerboseComments) {
                 System.err.println("You do not have " + normalizationType + " normalized maps available for this resolution/region:");
                 System.err.println("x1 " + binXStart + " x2 " + binXEnd + " y1 " + binYStart + " y2 " + binYEnd + " res " + zd.getBinSize());
                 System.err.println("Map is likely too sparse or a different normalization/resolution should be chosen.");
@@ -345,7 +345,7 @@ public class HiCFileTools {
             }
         }
 
-        if (HiCGlobals.printVerboseComments && numDataReadingErrors > 0) {
+        if (StrawGlobals.printVerboseComments && numDataReadingErrors > 0) {
             //System.err.println(numDataReadingErrors + " errors while reading data from region. Map is likely too sparse");
             triggerNormError(normalizationType);
         }

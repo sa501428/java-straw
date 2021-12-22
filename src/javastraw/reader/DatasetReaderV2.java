@@ -27,7 +27,7 @@ package javastraw.reader;
 
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.tribble.util.LittleEndianInputStream;
-import javastraw.HiCGlobals;
+import javastraw.StrawGlobals;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.block.*;
@@ -88,7 +88,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             long position = 0L;
 
             // Read the header
-            LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, HiCGlobals.bufferSize));
+            LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
             String magicString = dis.readString();
             position += magicString.length() + 1;
@@ -270,7 +270,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                                                           long filePointer) throws IOException {
         SeekableStream stream = getValidStream();
         stream.seek(filePointer);
-        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, HiCGlobals.bufferSize));
+        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
         String hicUnitStr = dis.readString();
         HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(hicUnitStr);
@@ -299,7 +299,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
         long currentFilePointer = filePointer + (9 * 4) + hicUnitStr.getBytes().length + 1; // i think 1 byte for 0 terminated string?
 
-        if (binSize < 50 && HiCGlobals.allowDynamicBlockIndex) {
+        if (binSize < 50 && StrawGlobals.allowDynamicBlockIndex) {
             int maxPossibleBlockNumber = blockColumnCount * blockColumnCount - 1;
             DynamicBlockIndex blockIndex = new DynamicBlockIndex(getValidStream(), nBlocks, maxPossibleBlockNumber, currentFilePointer);
             blockIndexMap.put(zd.getKey(), blockIndex);
@@ -441,7 +441,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         //disList.add(new ByteArrayInputStream(buffer));
 
         //dis = new LittleEndianInputStream(new SequenceInputStream(Collections.enumeration(disList)));
-        dis = new LittleEndianInputStream(new BufferedInputStream(stream, HiCGlobals.bufferSize));
+        dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
         int nEntries = dis.readInt();
         currentPosition += 4;
@@ -508,7 +508,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                 }
 
                 stream.seek(skipPosition);
-                dis = new LittleEndianInputStream(new BufferedInputStream(stream, HiCGlobals.bufferSize));
+                dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
                 //long skipPosition = stream.position();
                 int nNormalizationFactors = dis.readInt();
                 currentPosition = skipPosition + 4;
@@ -528,7 +528,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             //System.out.println(normVectorFilePosition);
             stream.seek(normVectorFilePosition);
             currentPosition = normVectorFilePosition;
-            dis = new LittleEndianInputStream(new BufferedInputStream(stream, HiCGlobals.bufferSize));
+            dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
             int nNormExpectedValueVectors;
             try {
@@ -536,7 +536,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                 currentPosition += 4;
                 //System.out.println(nExpectedValues);
             } catch (EOFException | HttpResponseException e) {
-                if (HiCGlobals.printVerboseComments) {
+                if (StrawGlobals.printVerboseComments) {
                     System.out.println("No normalization vectors");
                 }
                 return;
@@ -590,7 +590,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                     }
 
                     stream.seek(skipPosition);
-                    dis = new LittleEndianInputStream(new BufferedInputStream(stream, HiCGlobals.bufferSize));
+                    dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
                     //long skipPosition = stream.position();
                     int nNormalizationFactors = dis.readInt();
                     currentPosition = skipPosition + 4;
@@ -606,7 +606,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             }
 
             // Normalization vectors (indexed)
-            if (HiCGlobals.printVerboseComments) {
+            if (StrawGlobals.printVerboseComments) {
                 System.out.println("NVI " + currentPosition);
             }
 
@@ -900,7 +900,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             NormalizationVector nv2 = dataset.getNormalizationVector(zd.getChr2Idx(), zd.getZoom(), no);
 
             if (nv1 == null || nv2 == null) {
-                if (HiCGlobals.printVerboseComments) { // todo should this print an error always instead?
+                if (StrawGlobals.printVerboseComments) { // todo should this print an error always instead?
                     System.err.println("Norm " + no + " missing for: " + zd.getDescription());
                     System.err.println(nv1 + " - " + nv2);
                 }

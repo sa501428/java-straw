@@ -70,8 +70,8 @@ public class MatrixZoomData {
     private boolean useCache = true;
     private final Map<NormalizationType, BasicMatrix> pearsonsMap;
     private final Map<String, double[]> eigenvectorMap;
-    private final boolean useIteratorDontPutAllInRAM = false;
-    private final boolean shouldCheckRAMUsage = false;
+    public static boolean useIteratorDontPutAllInRAM = false;
+    public static boolean shouldCheckRAMUsage = false;
 
 
     /**

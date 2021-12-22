@@ -24,7 +24,7 @@
 
 package javastraw.tools;
 
-import javastraw.HiCGlobals;
+import javastraw.StrawGlobals;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -64,7 +64,7 @@ public class ParallelizationTools {
             service.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
             System.err.println("Error loading mzd data " + e.getLocalizedMessage());
-            if (HiCGlobals.printVerboseComments) {
+            if (StrawGlobals.printVerboseComments) {
                 e.printStackTrace();
             }
         }

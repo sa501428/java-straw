@@ -71,7 +71,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     private final IGVSeekableStreamFactory streamFactory = IGVSeekableStreamFactory.getInstance();
     private boolean activeStatus = true;
     public static double[] globalTimeDiffThings = new double[5];
-    private boolean useCache = true;
+    private final boolean useCache;
     private long nviHeaderPosition;
 
     public DatasetReaderV2(String path, boolean useCache) throws IOException {

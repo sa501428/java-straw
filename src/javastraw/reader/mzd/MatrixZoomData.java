@@ -35,6 +35,8 @@ import javastraw.reader.depth.LogDepth;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.iterators.IteratorContainer;
+import javastraw.reader.iterators.ListOfListGenerator;
+import javastraw.reader.iterators.ZDIteratorContainer;
 import javastraw.reader.pearsons.PearsonsManager;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.MatrixType;
@@ -68,6 +70,8 @@ public class MatrixZoomData {
     private boolean useCache = true;
     private final Map<NormalizationType, BasicMatrix> pearsonsMap;
     private final Map<String, double[]> eigenvectorMap;
+    private final boolean useIteratorDontPutAllInRAM = false;
+    private final boolean shouldCheckRAMUsage = false;
 
 
     /**
@@ -139,6 +143,10 @@ public class MatrixZoomData {
 
     public int getChr2Idx() {
         return chr2.getIndex();
+    }
+
+    public long getMatrixSize() {
+        return chr1.getLength() / zoom.getBinSize() + 1;
     }
 
     public long getCorrectedBinCount() {
@@ -738,14 +746,21 @@ public class MatrixZoomData {
 
     private Iterator<ContactRecord> getNewContactRecordIterator() {
         return getIteratorContainer().getNewContactRecordIterator();
+        //return new ContactRecordIterator(reader, this, blockCache);
     }
 
     public IteratorContainer getIteratorContainer() {
         if (iteratorContainer == null) {
-            iteratorContainer = new IteratorContainer(reader, this, blockCache, useCache);
+            iteratorContainer = ListOfListGenerator.createFromZD(reader, this, blockCache, useCache,
+                    useIteratorDontPutAllInRAM, shouldCheckRAMUsage);
         }
         return iteratorContainer;
     }
+
+    public IteratorContainer getFromFileIteratorContainer() {
+        return new ZDIteratorContainer(reader, this, blockCache, useCache);
+    }
+
 
     public BasicMatrix getPearsons(ExpectedValueFunction df) {
         if (chr1.getIndex() != chr2.getIndex()) {

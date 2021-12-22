@@ -48,7 +48,8 @@ public enum MatrixType {
     CME("Control-ExpectedC"),
     PEARSONCTRL("Control Pearson"),
     LOGC("Log(Control+1)"),
-    LOGCEO("Log(Control+1)/Log(ExpectedC+1)"),
+    LOGCEO("Log[Control+1]/Log[ExpectedC+1]"),
+    EXPLOGCEO("e^(Log[Control+1]/Log[ExpectedC+1])"),
     NORM2CTRL("Control Norm^2"),
     RATIO("Observed/Control * (AvgC/AvgO)"),
     RATIOV2("Log(Observed/Control * (AvgC/AvgO))"),
@@ -83,18 +84,20 @@ public enum MatrixType {
     NORM2OBSVSCTRL("Observed Norm^2 vs Control Norm^2");
 
     public static final MatrixType[] enabledMatrixTypesWithControl = new MatrixType[]{
-            OBSERVED, EXPECTED, OE, OEV2, OEP1, OEP1V2, OME, PEARSON, LOG, LOGEO,
-            CONTROL, OECTRL, OECTRLV2, OECTRLP1, OECTRLP1V2, CME, PEARSONCTRL, LOGC, LOGCEO,
-            VS, RATIO, RATIOV2, RATIOP1, RATIOP1V2, RATIO0, RATIO0V2, RATIO0P1, RATIO0P1V2,
-            OERATIO, OERATIOV2, OERATIOP1, OERATIOP1V2, OERATIOMINUS, OERATIOMINUSP1,
-            OEVS, OEVSV2, OEVSP1, OEVSP1V2, OCMEVS, PEARSONVS, DIFF,
-            LOGVS, LOGEOVS, LOGRATIO, LOGRATIOV2, LOGEORATIO, LOGEORATIOV2,
-            METALOGEO, EXPLOGEO, EXPLOGEOINV
+            OBSERVED, CONTROL, VS,
+            EXPECTED,
+            OE, OECTRL, OEVS,
+            OEV2, OECTRLV2, OEVSV2,
+            RATIO, RATIOV2,
+            PEARSON, PEARSONCTRL, PEARSONVS,
+            LOG, LOGC, LOGVS,
+            RATIO0, RATIO0V2,
+            OERATIO, OERATIOV2,
+            EXPLOGEO, EXPLOGCEO
     };
 
     public static final MatrixType[] enabledMatrixTypesNoControl =
-            new MatrixType[]{OBSERVED, EXPECTED, OE, OEV2, OEP1, OEP1V2, OME, PEARSON, LOG, LOGEO, METALOGEO, EXPLOGEO,
-                    EXPLOGEOINV};
+            new MatrixType[]{OBSERVED, EXPECTED, OE, OEV2, PEARSON, LOG, EXPLOGEO};
 
     private final String value;
 

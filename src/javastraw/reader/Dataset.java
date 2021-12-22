@@ -394,4 +394,8 @@ public class Dataset {
     public int getDepthBase() {
         return v9DepthBase;
     }
+
+    public String getPath() {
+        return reader.getPath();
+    }
 }

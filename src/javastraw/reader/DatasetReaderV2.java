@@ -232,7 +232,6 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         return stream;
     }
 
-
     public String readStats() throws IOException {
         String statsFileName = path.substring(0, path.lastIndexOf('.')) + "_stats.html";
         String stats;

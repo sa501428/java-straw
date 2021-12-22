@@ -33,9 +33,7 @@ import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
 import javastraw.reader.type.NormalizationType;
-import org.broad.igv.util.FileUtils;
 import org.broad.igv.util.Pair;
-import org.broad.igv.util.ResourceLocator;
 import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
@@ -43,7 +41,15 @@ import java.util.*;
 
 public class Dataset {
 
-    private static final String V9_DEPTH_BASE = "v9-depth-base";
+    public static final String V9_DEPTH_BASE = "v9-depth-base";
+    public static final int DEFAULT_V9_DEPTH_BASE = 2;
+    public static final String HIC_FILE_SCALING = "hicFileScalingFactor";
+    public static final String STATISTICS = "statistics";
+    public static final String GRAPHS = "graphs";
+    public static final String SOFTWARE = "software";
+    public static final String NVI_INDEX = "nviIndex";
+    public static final String NVI_LENGTH = "nviLength";
+
     private final Map<String, Matrix> matrices = new HashMap<>(625);
     private final DatasetReader reader;
     private final LRUCache<String, double[]> eigenvectorCache;
@@ -124,114 +130,6 @@ public class Dataset {
     }
 
 
-    public ResourceLocator getSubcompartments() {
-        ResourceLocator locator = null;
-
-        String path = reader.getPath();
-        //Special case for combined maps:
-        if (path == null) {
-            return null;
-        }
-
-        if (path.contains("gm12878/in-situ/combined")) {
-            path = path.substring(0, path.lastIndexOf('.'));
-            if (path.lastIndexOf("_30") > -1) {
-                path = path.substring(0, path.lastIndexOf("_30"));
-            }
-
-            String location = path + "_subcompartments.bed";
-            locator = new ResourceLocator(location);
-
-            locator.setName("Subcompartments");
-        }
-        return locator;
-    }
-
-    public ResourceLocator getSuperLoops() {
-        ResourceLocator locator = null;
-
-        String path = reader.getPath();
-        //Special case for combined maps:
-        if (path == null) {
-            return null;
-        }
-
-        if (path.contains("gm12878/in-situ/combined")) {
-            path = path.substring(0, path.lastIndexOf('.'));
-
-            if (path.lastIndexOf("_30") > -1) {
-                path = path.substring(0, path.lastIndexOf("_30"));
-            }
-
-            String location = path + "_chrX_superloop_list.txt";
-            locator = new ResourceLocator(location);
-
-            locator.setName("ChrX super loops");
-        }
-        return locator;
-    }
-
-    public ResourceLocator getPeaks() {
-
-        String path = reader.getPath();
-
-        //Special case for combined maps:
-        if (path == null) {
-            return null;
-        }
-
-        path = path.substring(0, path.lastIndexOf('.'));
-
-
-        if (path.lastIndexOf("_30") > -1) {
-            path = path.substring(0, path.lastIndexOf("_30"));
-        }
-
-        String location = path + "_peaks.txt";
-
-        if (FileUtils.resourceExists(location)) {
-            return new ResourceLocator(location);
-        } else {
-            location = path + "_loops.txt";
-            if (FileUtils.resourceExists(location)) {
-                return new ResourceLocator(location);
-            } else {
-                return null;
-            }
-        }
-
-    }
-
-    public ResourceLocator getBlocks() {
-
-        String path = reader.getPath();
-
-        //Special case for combined maps:
-        if (path == null) {
-            return null;
-        }
-
-        path = path.substring(0, path.lastIndexOf('.'));
-
-        if (path.lastIndexOf("_30") > -1) {
-            path = path.substring(0, path.lastIndexOf("_30"));
-        }
-
-        String location = path + "_blocks.txt";
-
-        if (FileUtils.resourceExists(location)) {
-            return new ResourceLocator(location);
-        } else {
-            location = path + "_domains.txt";
-            if (FileUtils.resourceExists(location)) {
-                return new ResourceLocator(location);
-            } else {
-                return null;
-            }
-
-        }
-
-    }
 
     public void setAttributes(Map<String, String> map) {
         this.attributes = map;
@@ -341,6 +239,34 @@ public class Dataset {
         if (genomeId.equals("GRCm38"))
             genomeId = "mm10";
         this.genomeId = genomeId;
+    }
+
+    public String getSoftware() {
+        if (attributes != null) return attributes.get(SOFTWARE);
+        else return null;
+    }
+
+    public String getHiCFileScalingFactor() {
+        if (attributes != null) return attributes.get(HIC_FILE_SCALING);
+        else return null;
+    }
+
+    public String getStatistics() {
+        String stats = null;
+        if (attributes != null) stats = attributes.get(STATISTICS);
+        if (stats == null) {
+            try {
+                attributes.put(STATISTICS, reader.readStats());
+            } catch (IOException error) {
+                return null;
+            }
+        }
+        return attributes.get(STATISTICS);
+    }
+
+    public String getGraphs() {
+        if (attributes == null) return null;
+        return attributes.get(GRAPHS);
     }
 
     public List<HiCZoom> getBpZooms() {

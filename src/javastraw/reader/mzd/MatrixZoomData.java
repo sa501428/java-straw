@@ -324,7 +324,7 @@ public class MatrixZoomData {
                 if (b == null) {
                     b = new Block(blockNumber, key);
                 }
-                b = modifier.modify(b);
+                b = modifier.modify(b, key, getBinSize(), getChr1(), getChr2());
                 if (useCache) {
                     blockCache.put(key, b);
                 }

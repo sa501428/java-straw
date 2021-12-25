@@ -61,7 +61,7 @@ public class MatrixZoomData {
     protected final int blockColumnCount;     // number of block columns
     private final long correctedBinCount;
     // Cache the last 20 blocks loaded
-    protected final LRUCache<String, Block> blockCache = new LRUCache<>(500);
+    protected final LRUCache<String, Block> blockCache;
     private final V9Depth v9Depth;
     private double averageCount = -1;
     protected DatasetReader reader;
@@ -81,6 +81,7 @@ public class MatrixZoomData {
         this.isIntra = chr1.getIndex() == chr2.getIndex();
         this.reader = reader;
         this.blockBinCount = blockBinCount;
+        blockCache = new LRUCache<>(500);
         if (reader.getVersion() > 8) {
             v9Depth = V9Depth.setDepthMethod(reader.getDepthBase(), blockBinCount);
         } else {
@@ -106,6 +107,24 @@ public class MatrixZoomData {
         }
         pearsonsMap = new HashMap<>();
         eigenvectorMap = new HashMap<>();
+    }
+
+    protected MatrixZoomData(MatrixZoomData zd0) {
+        this.chr1 = zd0.chr1;
+        this.chr2 = zd0.chr2;
+        this.isIntra = zd0.isIntra;
+        this.zoom = zd0.zoom;
+        this.blockBinCount = zd0.blockBinCount;
+        this.blockColumnCount = zd0.blockColumnCount;
+        this.correctedBinCount = zd0.correctedBinCount;
+        this.blockCache = zd0.blockCache;
+        this.v9Depth = zd0.v9Depth;
+        this.averageCount = zd0.averageCount;
+        this.reader = zd0.reader;
+        this.iteratorContainer = zd0.iteratorContainer;
+        this.useCache = zd0.useCache;
+        this.pearsonsMap = zd0.pearsonsMap;
+        this.eigenvectorMap = zd0.eigenvectorMap;
     }
 
     public void setUseCache(boolean useCache) {

@@ -52,26 +52,26 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MatrixZoomData {
 
-    final Chromosome chr1;  // Chromosome on the X axis
-    final Chromosome chr2;  // Chromosome on the Y axis
-    private final boolean isIntra;
-    final HiCZoom zoom;    // Unit and bin size
+    protected final Chromosome chr1;  // Chromosome on the X axis
+    protected final Chromosome chr2;  // Chromosome on the Y axis
+    protected final boolean isIntra;
+    protected final HiCZoom zoom;    // Unit and bin size
     // Observed values are organized into sub-matrices ("blocks")
     protected final int blockBinCount;   // block size in bins
     protected final int blockColumnCount;     // number of block columns
-    private final long correctedBinCount;
+    protected final long correctedBinCount;
     // Cache the last 20 blocks loaded
     protected final LRUCache<String, Block> blockCache;
-    private final V9Depth v9Depth;
-    private double averageCount = -1;
+    protected final V9Depth v9Depth;
+    protected final Map<NormalizationType, BasicMatrix> pearsonsMap;
     protected DatasetReader reader;
-    private IteratorContainer iteratorContainer = null;
-    private boolean useCache = true;
-    private final Map<NormalizationType, BasicMatrix> pearsonsMap;
-    private final Map<String, double[]> eigenvectorMap;
+    protected final Map<String, double[]> eigenvectorMap;
+    protected final BlockModifier identity = new IdentityModifier();
+    protected double averageCount = -1;
+    protected IteratorContainer iteratorContainer = null;
     public static boolean useIteratorDontPutAllInRAM = false;
     public static boolean shouldCheckRAMUsage = false;
-    private final BlockModifier identity = new IdentityModifier();
+    protected boolean useCache = true;
 
     public MatrixZoomData(Chromosome chr1, Chromosome chr2, HiCZoom zoom, int blockBinCount, int blockColumnCount,
                           int[] chr1Sites, int[] chr2Sites, DatasetReader reader) {
@@ -462,6 +462,10 @@ public class MatrixZoomData {
         return pearsonsMap.get(df.getNormalizationType());
     }
 
+    protected BasicMatrix getPearsons(NormalizationType type) {
+        return pearsonsMap.get(type);
+    }
+
     public float getPearsonValue(int binX, int binY, NormalizationType type) {
         BasicMatrix pearsons = pearsonsMap.get(type);
         if (pearsons != null) {
@@ -495,5 +499,9 @@ public class MatrixZoomData {
 
     protected String getEigenvectorKey(NormalizationType normalizationType, int which) {
         return normalizationType.getLabel() + "_" + which;
+    }
+
+    protected double[] getEigenvector(NormalizationType normalizationType, int which) {
+        return eigenvectorMap.get(getEigenvectorKey(normalizationType, which));
     }
 }

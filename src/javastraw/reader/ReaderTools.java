@@ -132,9 +132,12 @@ public class ReaderTools {
         return new Pair<>(zd, currentFilePointer);
     }
 
-    static long readExpectedVectorInFooter(long currentPosition, LittleEndianInputStream dis,
+    static long readExpectedVectorInFooter(long currentPosition,
                                            Map<String, ExpectedValueFunction> expectedValuesMap,
                                            NormalizationType norm, int version, String path, DatasetReader reader) throws IOException {
+        SeekableStream stream = ReaderTools.getValidStream(path);
+        stream.seek(currentPosition);
+        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
         String unitString = dis.readString();
         currentPosition += (unitString.length() + 1);
         HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(unitString);
@@ -151,6 +154,7 @@ public class ReaderTools {
             currentPosition = ReaderTools.setUpPartialVectorStreaming(currentPosition, expectedValuesMap, unit, binSize,
                     nValues[0], norm, version, path, reader);
         }
+        stream.close();
         return currentPosition;
     }
 
@@ -189,6 +193,7 @@ public class ReaderTools {
                 expectedVectorIndexPosition, hmReader.getNormFactors(), reader);
         String key = ExpectedValueFunction.getKey(unit, binSize, norm);
         expectedValuesMap.put(key, df);
+        stream.close();
         return currentPosition;
     }
 

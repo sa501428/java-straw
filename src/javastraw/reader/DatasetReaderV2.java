@@ -204,13 +204,12 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                 dataset.setFragmentCounts(map);
             }
 
-
             readFooter(masterIndexPos);
 
             stream.close();
         } catch (IOException e) {
-            System.err.println("Error reading dataset" + e.getLocalizedMessage());
-            throw e;
+            System.err.println("Error reading dataset : " + e.getLocalizedMessage());
+            e.printStackTrace();
         }
 
         return dataset;
@@ -332,50 +331,23 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
     private void readFooter(long position) throws IOException {
 
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(position);
-        long currentPosition = position;
-
-        //Get the size in bytes of the v5 footer, that is the footer up to normalization and normalized expected values
+        long currentPosition;
         if (version > 8) {
-            currentPosition += determineNormVectorFilePosition(8, stream);
+            currentPosition = determineNormVectorFilePosition(8, position);
         } else {
-            currentPosition += determineNormVectorFilePosition(4, stream);
+            currentPosition = determineNormVectorFilePosition(4, position);
         }
 
-        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
-
-        int nEntries = dis.readInt();
-        currentPosition += 4;
-
-        for (int i = 0; i < nEntries; i++) {
-            String key = dis.readString();
-            currentPosition += (key.length() + 1);
-            long filePosition = dis.readLong();
-            int sizeInBytes = dis.readInt();
-            currentPosition += 12;
-            masterIndex.put(key, new IndexEntry(filePosition, sizeInBytes));
-        }
-
-        Map<String, ExpectedValueFunction> expectedValuesMap = new LinkedHashMap<>();
-
-        // Expected values from non-normalized matrix
-        int nExpectedValues = dis.readInt();
-        currentPosition += 4;
-        //System.err.println(nExpectedValues);
-
-        for (int i = 0; i < nExpectedValues; i++) {
-            NormalizationType norm = NormalizationHandler.NONE;
-            currentPosition = ReaderTools.readExpectedVectorInFooter(currentPosition, dis, expectedValuesMap, norm,
-                    version, path, this);
-        }
-        dataset.setExpectedValueFunctionMap(expectedValuesMap);
+        currentPosition = populateMasterIndex(currentPosition);
+        currentPosition = readExpectedValuesMapForNone(currentPosition);
 
         // Normalized expected values (v6 and greater only)
         if (version >= 6) {
-            stream.seek(normVectorFilePosition);
             currentPosition = normVectorFilePosition;
-            dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+            SeekableStream stream = ReaderTools.getValidStream(path);
+            stream.seek(currentPosition);
+            LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+
 
             int nNormExpectedValueVectors;
             try {
@@ -389,10 +361,13 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             }
 
             for (int i = 0; i < nNormExpectedValueVectors; i++) {
+                stream.seek(currentPosition);
+                dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+
                 String typeString = dis.readString();
                 NormalizationType norm = dataset.getNormalizationHandler().getNormTypeFromString(typeString);
                 currentPosition += (typeString.length() + 1);
-                currentPosition = ReaderTools.readExpectedVectorInFooter(currentPosition, dis, expectedValuesMap, norm,
+                currentPosition = ReaderTools.readExpectedVectorInFooter(currentPosition, dataset.getExpectedValueFunctionMap(), norm,
                         version, path, this);
             }
 
@@ -400,6 +375,9 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             if (StrawGlobals.printVerboseComments) {
                 System.out.println("NVI " + currentPosition);
             }
+
+            stream.seek(currentPosition);
+            dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
             int nNormVectors = dis.readInt();
             normVectorIndex = new HashMap<>(nNormVectors * 2);
@@ -418,22 +396,67 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
                 normVectorIndex.put(key, new LargeIndexEntry(filePosition, sizeInBytes));
             }
+            stream.close();
         }
-        stream.close();
     }
 
-    private int determineNormVectorFilePosition(int varSize, SeekableStream stream) throws IOException {
-        byte[] buffer = new byte[varSize];
-        stream.read(buffer);
-        LittleEndianInputStream dis = new LittleEndianInputStream(new ByteArrayInputStream(buffer));
-        long nBytes;
-        if (varSize == 4) {
-            nBytes = dis.readInt();
-        } else {
-            nBytes = dis.readLong();
+    private long readExpectedValuesMapForNone(long currentPosition) throws IOException {
+        Map<String, ExpectedValueFunction> expectedValuesMap = new LinkedHashMap<>();
+        SeekableStream stream = ReaderTools.getValidStream(path);
+        stream.seek(currentPosition);
+        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+        int nExpectedValues = dis.readInt();
+        currentPosition += 4;
+        for (int i = 0; i < nExpectedValues; i++) {
+            NormalizationType norm = NormalizationHandler.NONE;
+            currentPosition = ReaderTools.readExpectedVectorInFooter(currentPosition, expectedValuesMap, norm,
+                    version, path, this);
         }
-        normVectorFilePosition = masterIndexPos + nBytes + varSize;
-        return varSize;
+        dataset.setExpectedValueFunctionMap(expectedValuesMap);
+        stream.close();
+        return currentPosition;
+    }
+
+    private long populateMasterIndex(long currentPosition) throws IOException {
+        SeekableStream stream = ReaderTools.getValidStream(path);
+        stream.seek(currentPosition);
+        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+
+        int nEntries = dis.readInt();
+        currentPosition += 4;
+
+        for (int i = 0; i < nEntries; i++) {
+            String key = dis.readString();
+            currentPosition += (key.length() + 1);
+            long filePosition = dis.readLong();
+            int sizeInBytes = dis.readInt();
+            currentPosition += 12;
+            masterIndex.put(key, new IndexEntry(filePosition, sizeInBytes));
+        }
+        stream.close();
+        return currentPosition;
+    }
+
+    private long determineNormVectorFilePosition(int numBytesInVar, long position) throws IOException {
+        SeekableStream stream = ReaderTools.getValidStream(path);
+        stream.seek(position);
+        byte[] buffer = new byte[numBytesInVar];
+        int actualBytes = stream.read(buffer);
+        if (numBytesInVar == actualBytes) {
+            LittleEndianInputStream dis = new LittleEndianInputStream(new ByteArrayInputStream(buffer));
+            long nBytes;
+            if (numBytesInVar == 4) {
+                nBytes = dis.readInt();
+            } else {
+                nBytes = dis.readLong();
+            }
+            normVectorFilePosition = masterIndexPos + nBytes + numBytesInVar;
+        } else {
+            System.err.println("Actually read " + actualBytes + " bytes instead of " + numBytesInVar);
+            System.exit(10);
+        }
+        stream.close();
+        return position + actualBytes;
     }
 
     @Override

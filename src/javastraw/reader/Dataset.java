@@ -199,9 +199,10 @@ public class Dataset {
                                                                       int window) {
         String key = ExpectedValueFunction.getKey(zoom, type, true, window);
         if (!expectedValueFunctionMap.containsKey(key)) {
-            ExpectedValueFunction evf = expectedValueFunctionMap.get(key);
-            if (evf == null) return null;
-            expectedValueFunctionMap.put(key, evf.getCorrectedVersion(window));
+            String normalKey = ExpectedValueFunction.getKey(zoom, type, false, window);
+            ExpectedValueFunction normalEVF = expectedValueFunctionMap.get(normalKey);
+            if (normalEVF == null) return null;
+            expectedValueFunctionMap.put(key, normalEVF.getCorrectedVersion(window));
         }
         return expectedValueFunctionMap.get(key);
     }

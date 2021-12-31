@@ -37,7 +37,6 @@ import java.util.Map;
  */
 public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 
-	private static final int FIVE_MB = 5000000;
 	private final DatasetReader reader;
 	private final int binSize;
 	private final NormalizationType type;
@@ -74,10 +73,6 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 		this.filePosition = filePosition;
 		this.reader = reader;
 		this.version = reader.getVersion();
-	}
-
-	public static String getKey(HiCZoom zoom, NormalizationType normType) {
-		return zoom.getKey() + "_" + normType;
 	}
 
 	// This is exposed for testing, should not use directly
@@ -179,10 +174,10 @@ public class ExpectedValueFunctionImpl implements ExpectedValueFunction {
 	}
 
 	@Override
-	public ExpectedValueFunction getCorrectedVersion() {
+	public ExpectedValueFunction getCorrectedVersion(int window) {
 		streamExpectedVectorFromFileIfNeeded();
 		ListOfDoubleArrays smoothVector = expectedValues.deepClone();
-		smoothVector.doRollingMedian(FIVE_MB / binSize);
+		smoothVector.doRollingMedian(window / binSize);
 		return new ExpectedValueFunctionImpl(type, unit, binSize, smoothVector, normFactors);
 	}
 

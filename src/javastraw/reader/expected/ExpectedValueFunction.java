@@ -30,6 +30,8 @@ import javastraw.reader.type.NormalizationType;
 
 public interface ExpectedValueFunction {
 
+    int DEFAULT_CORRECTION_DISTANCE = 5000000;
+
     double getExpectedValue(int chrIdx, long distance);
 
     long getLength();
@@ -44,5 +46,17 @@ public interface ExpectedValueFunction {
 
     ListOfDoubleArrays getExpectedValuesWithNormalization(int chrIdx);
 
-    ExpectedValueFunction getCorrectedVersion();
+    static String getKey(HiCZoom zoom, NormalizationType normType, boolean isCorrected, int window) {
+        if (isCorrected) {
+            return zoom.getKey() + "_" + normType + "_" + window;
+        } else {
+            return zoom.getKey() + "_" + normType;
+        }
+    }
+
+    static String getKey(HiCZoom.HiCUnit unit, int binSize, NormalizationType normType) {
+        return getKey(new HiCZoom(unit, binSize), normType, false, 0);
+    }
+
+    ExpectedValueFunction getCorrectedVersion(int window);
 }

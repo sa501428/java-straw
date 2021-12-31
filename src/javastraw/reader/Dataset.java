@@ -28,7 +28,6 @@ import com.google.common.primitives.Ints;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.expected.ExpectedValueFunction;
-import javastraw.reader.expected.ExpectedValueFunctionImpl;
 import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
@@ -57,7 +56,6 @@ public class Dataset {
     private final String restrictionEnzyme = null;
     protected String genomeId;
     protected List<HiCZoom> bpZooms, dynamicZooms, fragZooms;
-    private Map<String, ExpectedValueFunction> correctedExpectedValueFunctionMap = null;
     private Map<String, ExpectedValueFunction> expectedValueFunctionMap = null;
     private int v9DepthBase = 0;
     private List<Integer> bpZoomResolutions;
@@ -183,25 +181,29 @@ public class Dataset {
 
     public ExpectedValueFunction getExpectedValues(HiCZoom zoom, NormalizationType type, boolean getCorrectedVersion) {
         if (expectedValueFunctionMap == null || zoom == null || type == null) return null;
-        String key = ExpectedValueFunctionImpl.getKey(zoom, type);
         if (getCorrectedVersion) {
-            return getCorrectedVersionOfExpectedVector(zoom, type);
+            return getCustomCorrectedExpectedValues(zoom, type, ExpectedValueFunction.DEFAULT_CORRECTION_DISTANCE);
+        } else {
+            String key = ExpectedValueFunction.getKey(zoom, type, false, 0);
+            return expectedValueFunctionMap.get(key);
         }
-        return expectedValueFunctionMap.get(key);
     }
 
-    private ExpectedValueFunction getCorrectedVersionOfExpectedVector(HiCZoom zoom, NormalizationType type) {
-        if (correctedExpectedValueFunctionMap == null || expectedValueFunctionMap == null
-                || zoom == null || type == null) {
-            return null;
-        }
-        String key = ExpectedValueFunctionImpl.getKey(zoom, type);
-        if (!correctedExpectedValueFunctionMap.containsKey(key)) {
+    public ExpectedValueFunction getCustomCorrectedExpectedValues(HiCZoom zoom, NormalizationType type,
+                                                                  int window) {
+        if (expectedValueFunctionMap == null || zoom == null || type == null) return null;
+        return getCorrectedVersionOfExpectedVector(zoom, type, window);
+    }
+
+    private ExpectedValueFunction getCorrectedVersionOfExpectedVector(HiCZoom zoom, NormalizationType type,
+                                                                      int window) {
+        String key = ExpectedValueFunction.getKey(zoom, type, true, window);
+        if (!expectedValueFunctionMap.containsKey(key)) {
             ExpectedValueFunction evf = expectedValueFunctionMap.get(key);
             if (evf == null) return null;
-            correctedExpectedValueFunctionMap.put(key, evf.getCorrectedVersion());
+            expectedValueFunctionMap.put(key, evf.getCorrectedVersion(window));
         }
-        return correctedExpectedValueFunctionMap.get(key);
+        return expectedValueFunctionMap.get(key);
     }
 
     public ExpectedValueFunction getExpectedValuesOrExit(HiCZoom zoom, NormalizationType type, Chromosome chromosome,
@@ -220,7 +222,6 @@ public class Dataset {
 
     public void setExpectedValueFunctionMap(Map<String, ExpectedValueFunction> df) {
         this.expectedValueFunctionMap = df;
-        correctedExpectedValueFunctionMap = new HashMap<>();
     }
 
     public ChromosomeHandler getChromosomeHandler() {

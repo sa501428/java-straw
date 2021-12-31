@@ -75,16 +75,8 @@ public class SymmetricMatrix implements BasicMatrix {
 
 
     public float getColumnMean(int j) {
-        float sum = 0;
-        int count = 0;
-        for (int i = 0; i < dim; i++) {
-            float value = getEntry(i, j);
-            if (!Float.isNaN(value)) {
-                sum += value;
-                count++;
-            }
-        }
-        return count == 0 ? Float.NaN : sum / count;
+        // symmetric
+        return getRowMean(j);
     }
 
     public float getRowMean(int i) {

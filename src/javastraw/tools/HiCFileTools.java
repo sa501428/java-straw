@@ -36,6 +36,7 @@ import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 import org.apache.commons.math3.linear.RealMatrix;
+import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
 import java.util.*;
@@ -54,15 +55,7 @@ public class HiCFileTools {
 
         try {
             DatasetReader reader = null;
-            if (allowPrinting)
-                System.out.println("Reading file: " + file);
-            String magicString = DatasetReaderFactory.getMagicString(file);
-            if (magicString.equals("HIC")) {
-                reader = new DatasetReaderV2(file, useCache);
-            } else {
-                System.err.println("This version of HIC is no longer supported");
-                System.exit(32);
-            }
+            reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader);
             dataset = reader.read();
             verifySupportedHiCFileVersion(reader.getVersion());
         } catch (Exception e) {
@@ -71,6 +64,20 @@ public class HiCFileTools {
             //e.printStackTrace();
         }
         return dataset;
+    }
+
+    @NotNull
+    private static DatasetReader getDatasetVerifyMagicString(boolean allowPrinting, boolean useCache, String file, DatasetReader reader) throws IOException {
+        if (allowPrinting)
+            System.out.println("Reading file: " + file);
+        String magicString = DatasetReaderFactory.getMagicString(file);
+        if (magicString.equals("HIC")) {
+            reader = new DatasetReaderV2(file, useCache);
+        } else {
+            System.err.println("This version of HIC is no longer supported");
+            System.exit(32);
+        }
+        return reader;
     }
 
     private static void verifySupportedHiCFileVersion(int version) throws RuntimeException {
@@ -87,15 +94,7 @@ public class HiCFileTools {
             file = cleanUpDropboxURL(file);
         }
         try {
-            if (allowPrinting)
-                System.out.println("Reading file: " + file);
-            String magicString = DatasetReaderFactory.getMagicString(file);
-            if (magicString.equals("HIC")) {
-                reader = new DatasetReaderV2(file, useCache);
-            } else {
-                System.err.println("This version of HIC is no longer supported");
-                System.exit(32);
-            }
+            reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader);
 
         } catch (Exception e) {
             System.err.println("Could not read hic file: " + e.getMessage());

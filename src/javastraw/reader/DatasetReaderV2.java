@@ -46,6 +46,7 @@ import org.broad.igv.util.CompressionUtils;
 import org.broad.igv.util.Pair;
 import org.broad.igv.util.ParsingUtils;
 import org.broad.igv.util.stream.IGVSeekableStreamFactory;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.*;
 import java.util.*;
@@ -736,12 +737,8 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         }
         if (idx == null) return null;
 
-        List<byte[]> buffer = seekAndFullyReadLargeCompressedBytes(idx);
-        List<ByteArrayInputStream> disList = new ArrayList<>();
-        for (int i = 0; i < buffer.size(); i++) {
-            disList.add(new ByteArrayInputStream(buffer.get(i)));
-        }
-        LittleEndianInputStream dis = new LittleEndianInputStream(new SequenceInputStream(Collections.enumeration(disList)));
+
+        LittleEndianInputStream dis = createStreamFromSeveralBuffers(idx);
 
         long nValues;
         if (version > 8) {
@@ -749,6 +746,12 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         } else {
             nValues = dis.readInt();
         }
+        return createNormalizationVector(type, chrIdx, unit, binSize, useVCForVCSQRT, dis, nValues);
+    }
+
+
+    @Nullable
+    private NormalizationVector createNormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize, boolean useVCForVCSQRT, LittleEndianInputStream dis, long nValues) throws IOException {
         ListOfDoubleArrays values = new ListOfDoubleArrays(nValues);
         boolean allNaN = true;
         for (long i = 0; i < nValues; i++) {
@@ -779,51 +782,34 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         }
         if (idx == null) return null;
 
-        long partPosition = version > 8 ? idx.position + 8 + 4*bound1 : idx.position + 4 + 8*bound1;
-        long partSize = version > 8 ? (bound2-bound1+1) * 4 : (bound2-bound1+1) * 8;
-        LargeIndexEntry partIdx = new LargeIndexEntry(partPosition, partSize);
+        long partPosition = version > 8 ? idx.position + 8 + 4L * bound1 : idx.position + 4 + 8L * bound1;
+        long partSize = version > 8 ? (bound2 - bound1 + 1) * 4L : (bound2 - bound1 + 1) * 8L;
 
-        List<byte[]> buffer = seekAndFullyReadLargeCompressedBytes(partIdx);
-        List<ByteArrayInputStream> disList = new ArrayList<>();
-        for (int i = 0; i < buffer.size(); i++) {
-            disList.add(new ByteArrayInputStream(buffer.get(i)));
-        }
-        LittleEndianInputStream dis = new LittleEndianInputStream(new SequenceInputStream(Collections.enumeration(disList)));
-
-        long nValues = bound2-bound1+1;
-        ListOfDoubleArrays values = new ListOfDoubleArrays(nValues);
-        boolean allNaN = true;
-        for (long i = 0; i < nValues; i++) {
-            double val = version > 8 ? (double) dis.readFloat() : dis.readDouble();
-            if (!useVCForVCSQRT) {
-                values.set(i, val);
-            } else {
-                values.set(i, Math.sqrt(val));
-            }
-            if (!Double.isNaN(val)) {
-                allNaN = false;
-            }
-        }
-        if (allNaN) return null;
-        else return new NormalizationVector(type, chrIdx, unit, binSize, values);
+        LittleEndianInputStream dis = createStreamFromSeveralBuffers(new LargeIndexEntry(partPosition, partSize));
+        long nValues = bound2 - bound1 + 1;
+        return createNormalizationVector(type, chrIdx, unit, binSize, useVCForVCSQRT, dis, nValues);
     }
 
     @Override
     public ListOfDoubleArrays readExpectedVectorPart(long position, long nVals) throws IOException {
         long size = version > 8 ? nVals * 4 : nVals * 8;
         LargeIndexEntry idx = new LargeIndexEntry(position, size);
-        List<byte[]> buffer = seekAndFullyReadLargeCompressedBytes(idx);
-        List<ByteArrayInputStream> disList = new ArrayList<>();
-        for (int i = 0; i < buffer.size(); i++) {
-            disList.add(new ByteArrayInputStream(buffer.get(i)));
-        }
-        LittleEndianInputStream dis = new LittleEndianInputStream(new SequenceInputStream(Collections.enumeration(disList)));
+        LittleEndianInputStream dis = createStreamFromSeveralBuffers(idx);
         ListOfDoubleArrays values = new ListOfDoubleArrays(nVals);
         for (int i = 0; i < nVals; i++) {
             double val = version > 8 ? dis.readFloat() : dis.readDouble();
             values.set(i, val);
         }
         return values;
+    }
+
+    private LittleEndianInputStream createStreamFromSeveralBuffers(LargeIndexEntry idx) throws IOException {
+        List<byte[]> buffer = seekAndFullyReadLargeCompressedBytes(idx);
+        List<ByteArrayInputStream> disList = new ArrayList<>();
+        for (int i = 0; i < buffer.size(); i++) {
+            disList.add(new ByteArrayInputStream(buffer.get(i)));
+        }
+        return new LittleEndianInputStream(new SequenceInputStream(Collections.enumeration(disList)));
     }
 
     private byte[] seekAndFullyReadCompressedBytes(IndexEntry idx) throws IOException {
@@ -956,48 +942,28 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                                 int rowCount = dis.readShort();
                                 for (int i = 0; i < rowCount; i++) {
                                     int binY = binYOffset + dis.readShort();
-                                    int colCount = dis.readShort();
-                                    for (int j = 0; j < colCount; j++) {
-                                        int binX = binXOffset + dis.readShort();
-                                        float counts = useShort ? dis.readShort() : dis.readFloat();
-                                        records.add(new ContactRecord(binX, binY, counts));
-                                    }
+                                    populateContactRecordsColShort(dis, records, binXOffset, useShort, binY);
                                 }
-                            } else if (useShortBinX && !useShortBinY) {
+                            } else if (useShortBinX) { // && !useShortBinY
                                 // List-of-rows representation
                                 int rowCount = dis.readInt();
                                 for (int i = 0; i < rowCount; i++) {
                                     int binY = binYOffset + dis.readInt();
-                                    int colCount = dis.readShort();
-                                    for (int j = 0; j < colCount; j++) {
-                                        int binX = binXOffset + dis.readShort();
-                                        float counts = useShort ? dis.readShort() : dis.readFloat();
-                                        records.add(new ContactRecord(binX, binY, counts));
-                                    }
+                                    populateContactRecordsColShort(dis, records, binXOffset, useShort, binY);
                                 }
-                            } else if (!useShortBinX && useShortBinY) {
+                            } else if (useShortBinY) { // && !useShortBinX
                                 // List-of-rows representation
                                 int rowCount = dis.readShort();
                                 for (int i = 0; i < rowCount; i++) {
                                     int binY = binYOffset + dis.readShort();
-                                    int colCount = dis.readInt();
-                                    for (int j = 0; j < colCount; j++) {
-                                        int binX = binXOffset + dis.readInt();
-                                        float counts = useShort ? dis.readShort() : dis.readFloat();
-                                        records.add(new ContactRecord(binX, binY, counts));
-                                    }
+                                    populateContactRecordsColInt(dis, records, binXOffset, useShort, binY);
                                 }
                             } else {
                                 // List-of-rows representation
                                 int rowCount = dis.readInt();
                                 for (int i = 0; i < rowCount; i++) {
                                     int binY = binYOffset + dis.readInt();
-                                    int colCount = dis.readInt();
-                                    for (int j = 0; j < colCount; j++) {
-                                        int binX = binXOffset + dis.readInt();
-                                        float counts = useShort ? dis.readShort() : dis.readFloat();
-                                        records.add(new ContactRecord(binX, binY, counts));
-                                    }
+                                    populateContactRecordsColInt(dis, records, binXOffset, useShort, binY);
                                 }
                             }
                             break;
@@ -1044,6 +1010,24 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             b = new Block(blockNumber, zd.getBlockKey(blockNumber, NormalizationHandler.NONE));
         }
         return b;
+    }
+
+    private void populateContactRecordsColShort(LittleEndianInputStream dis, List<ContactRecord> records, int binXOffset, boolean useShort, int binY) throws IOException {
+        int colCount = dis.readShort();
+        for (int j = 0; j < colCount; j++) {
+            int binX = binXOffset + dis.readShort();
+            float counts = useShort ? dis.readShort() : dis.readFloat();
+            records.add(new ContactRecord(binX, binY, counts));
+        }
+    }
+
+    private void populateContactRecordsColInt(LittleEndianInputStream dis, List<ContactRecord> records, int binXOffset, boolean useShort, int binY) throws IOException {
+        int colCount = dis.readInt();
+        for (int j = 0; j < colCount; j++) {
+            int binX = binXOffset + dis.readInt();
+            float counts = useShort ? dis.readShort() : dis.readFloat();
+            records.add(new ContactRecord(binX, binY, counts));
+        }
     }
 
     private byte[] decompress(byte[] compressedBytes) {

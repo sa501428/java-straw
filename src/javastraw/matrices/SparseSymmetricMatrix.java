@@ -65,6 +65,15 @@ public class SparseSymmetricMatrix implements BasicMatrix {
         double[] result = new double[vector.length];
         Arrays.fill(result, 0);
 
+        multiplyOverRowsCols(vector, result, rows1, cols1, values1);
+        if (rows2 != null) {
+            multiplyOverRowsCols(vector, result, rows2, cols2, values2);
+        }
+
+        return result;
+    }
+
+    private void multiplyOverRowsCols(double[] vector, double[] result, IntArrayList rows1, IntArrayList cols1, FloatArrayList values1) {
         int[] rowArray1 = rows1.toArray();
         int[] colArray1 = cols1.toArray();
         float[] valueArray1 = values1.toArray();
@@ -79,24 +88,6 @@ public class SparseSymmetricMatrix implements BasicMatrix {
                 result[col] += vector[row] * value;
             }
         }
-        if (rows2 != null) {
-            int[] rowArray2 = rows2.toArray();
-            int[] colArray2 = cols2.toArray();
-            float[] valueArray2 = values2.toArray();
-            int n2 = rowArray2.length;
-            for (int j = 0; j < n2; j++) {
-                int row = rowArray2[j];
-                int col = colArray2[j];
-                float value = valueArray2[j];
-                result[row] += vector[col] * value;
-
-                if (row != col) {
-                    result[col] += vector[row] * value;
-                }
-            }
-        }
-
-        return result;
     }
 
 
@@ -161,41 +152,4 @@ public class SparseSymmetricMatrix implements BasicMatrix {
             }
         }
     }
-
-     /*
-    public void print() {
-        print(new PrintWriter(System.out));
-    }
-
-    private void print(PrintWriter pw) {
-        for (int i = 0; i < totSize; i++) {
-            float[] row = getRow(i);
-            for (int j = 0; j < totSize; j++) {
-                pw.print(row[j] + " ");
-            }
-            pw.println();
-        }
-        pw.close();
-    }
-    */
-
-    /*
-    private float[] getRow(int rowNum) {
-
-        float[] result = new float[totSize];
-
-        int size = rows1.size();
-        for (int i = 0; i < size; i++) {
-            if (rows1.get(i) == rowNum) result[cols1.get(i)] = values1.get(i);
-        }
-        if (rows2 != null) {
-            size = rows2.size();
-            for (int i = 0; i < size; i++) {
-                if (rows2.get(i) == rowNum) result[cols2.get(i)] = values2.get(i);
-            }
-        }
-        return result;
-
-    }
-    */
 }

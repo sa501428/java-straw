@@ -465,54 +465,12 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
         for (int i = 0; i < nExpectedValues; i++) {
             NormalizationType norm = NormalizationHandler.NONE;
-            String unitString = dis.readString();
-            currentPosition += (unitString.length() + 1);
-            HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(unitString);
-            int binSize = dis.readInt();
-            currentPosition += 4;
-            String key = ExpectedValueFunction.getKey(unit, binSize, norm);
-            long nValues;
-            if (version > 8) {
-                nValues = dis.readLong();
-                currentPosition += 8;
-            } else {
-                nValues = dis.readInt();
-                currentPosition += 4;
-            }
-            //System.err.println(nValues);
-
-
-            if (binSize >= 500) {
-                currentPosition = readWholeNormalizationVector(currentPosition, dis, expectedValuesMap, unit, binSize,
-                        nValues, norm, version);
-            } else {
-                long skipPosition = currentPosition;
-                long expectedVectorIndexPosition = currentPosition;
-                if (version > 8) {
-                    skipPosition += (nValues * 4);
-                } else {
-                    skipPosition += (nValues * 8);
-                }
-
-                stream.seek(skipPosition);
-                dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
-                //long skipPosition = stream.position();
-                int nNormalizationFactors = dis.readInt();
-                currentPosition = skipPosition + 4;
-
-                NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, dis);
-                currentPosition += hmReader.getOffset();
-
-                expectedValuesMap.put(key, new ExpectedValueFunctionImpl(norm, unit, binSize, nValues,
-                        expectedVectorIndexPosition, hmReader.getNormFactors(), this));
-            }
+            currentPosition = readExpectedVectorInFooter(currentPosition, dis, expectedValuesMap, norm);
         }
         dataset.setExpectedValueFunctionMap(expectedValuesMap);
 
         // Normalized expected values (v6 and greater only)
         if (version >= 6) {
-            //System.out.println(stream.position());
-            //System.out.println(normVectorFilePosition);
             stream.seek(normVectorFilePosition);
             currentPosition = normVectorFilePosition;
             dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
@@ -521,7 +479,6 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             try {
                 nNormExpectedValueVectors = dis.readInt();
                 currentPosition += 4;
-                //System.out.println(nExpectedValues);
             } catch (EOFException | HttpResponseException e) {
                 if (StrawGlobals.printVerboseComments) {
                     System.out.println("No normalization vectors");
@@ -531,51 +488,9 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
             for (int i = 0; i < nNormExpectedValueVectors; i++) {
                 String typeString = dis.readString();
+                NormalizationType norm = dataset.getNormalizationHandler().getNormTypeFromString(typeString);
                 currentPosition += (typeString.length() + 1);
-                String unitString = dis.readString();
-                currentPosition += (unitString.length() + 1);
-                HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(unitString);
-                int binSize = dis.readInt();
-                currentPosition += 4;
-
-                long nValues;
-                if (version > 8) {
-                    nValues = dis.readLong();
-                    currentPosition += 8;
-                    //System.out.println(nValues);
-                } else {
-                    nValues = dis.readInt();
-                    currentPosition += 4;
-                }
-
-                if (binSize >= 500) {
-                    NormalizationType norm = dataset.getNormalizationHandler().getNormTypeFromString(typeString);
-                    currentPosition = readWholeNormalizationVector(currentPosition, dis, expectedValuesMap, unit, binSize,
-                            nValues, norm, version);
-                } else {
-                    long skipPosition = currentPosition;
-                    long expectedVectorIndexPosition = currentPosition;
-                    if (version > 8) {
-                        skipPosition += (nValues * 4);
-                    } else {
-                        skipPosition += (nValues * 8);
-                    }
-
-                    stream.seek(skipPosition);
-                    dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
-                    //long skipPosition = stream.position();
-                    int nNormalizationFactors = dis.readInt();
-                    currentPosition = skipPosition + 4;
-
-                    NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, dis);
-                    currentPosition += hmReader.getOffset();
-
-                    NormalizationType type = dataset.getNormalizationHandler().getNormTypeFromString(typeString);
-                    ExpectedValueFunction df = new ExpectedValueFunctionImpl(type, unit, binSize, nValues,
-                            expectedVectorIndexPosition, hmReader.getNormFactors(), this);
-                    String key = ExpectedValueFunction.getKey(unit, binSize, type);
-                    expectedValuesMap.put(key, df);
-                }
+                currentPosition = readExpectedVectorInFooter(currentPosition, dis, expectedValuesMap, norm);
             }
 
             // Normalization vectors (indexed)
@@ -602,6 +517,62 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             }
         }
         stream.close();
+    }
+
+    private long readExpectedVectorInFooter(long currentPosition, LittleEndianInputStream dis, Map<String, ExpectedValueFunction> expectedValuesMap, NormalizationType norm) throws IOException {
+        String unitString = dis.readString();
+        currentPosition += (unitString.length() + 1);
+        HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(unitString);
+        int binSize = dis.readInt();
+        currentPosition += 4;
+
+        long[] nValues = new long[1];
+        currentPosition += readVectorLength(dis, nValues, version);
+
+        if (binSize >= 500) {
+            currentPosition = readWholeNormalizationVector(currentPosition, dis, expectedValuesMap, unit, binSize,
+                    nValues[0], norm, version);
+        } else {
+            currentPosition = setUpPartialVectorStreaming(currentPosition, dis, expectedValuesMap, unit, binSize,
+                    nValues[0], norm, version);
+        }
+        return currentPosition;
+    }
+
+    private long readVectorLength(LittleEndianInputStream dis, long[] nValues, int version) throws IOException {
+        if (version > 8) {
+            nValues[0] = dis.readLong();
+            return 8;
+        } else {
+            nValues[0] = dis.readInt();
+            return 4;
+        }
+    }
+
+    private long setUpPartialVectorStreaming(long currentPosition, LittleEndianInputStream dis, Map<String, ExpectedValueFunction> expectedValuesMap, HiCZoom.HiCUnit unit, int binSize, long nValues, NormalizationType norm, int version) throws IOException {
+        long skipPosition = currentPosition;
+        long expectedVectorIndexPosition = currentPosition;
+        if (version > 8) {
+            skipPosition += (nValues * 4);
+        } else {
+            skipPosition += (nValues * 8);
+        }
+
+        SeekableStream stream = getValidStream();
+        stream.seek(skipPosition);
+        dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+        //long skipPosition = stream.position();
+        int nNormalizationFactors = dis.readInt();
+        currentPosition = skipPosition + 4;
+
+        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, dis);
+        currentPosition += hmReader.getOffset();
+
+        ExpectedValueFunction df = new ExpectedValueFunctionImpl(norm, unit, binSize, nValues,
+                expectedVectorIndexPosition, hmReader.getNormFactors(), this);
+        String key = ExpectedValueFunction.getKey(unit, binSize, norm);
+        expectedValuesMap.put(key, df);
+        return currentPosition;
     }
 
     private long readWholeNormalizationVector(long currentPosition, LittleEndianInputStream dis,

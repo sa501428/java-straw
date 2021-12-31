@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class ListIteratorContainer extends IteratorContainer {
 
-    private final List<ContactRecord> readList;
+    protected final List<ContactRecord> readList;
 
     public ListIteratorContainer(List<ContactRecord> readList, long matrixSize) {
         super(matrixSize);

@@ -37,10 +37,9 @@ public class ListOfListIteratorContainer extends IteratorContainer {
 
     private final BigContactRecordList allContactRecords;
 
-    public ListOfListIteratorContainer(BigContactRecordList allContactRecords, long matrixSize,
-                                       long totalNumberOfContacts) {
+    public ListOfListIteratorContainer(BigContactRecordList allContactRecords, long matrixSize) {
         super(matrixSize);
-        setNumberOfContactRecords(totalNumberOfContacts);
+        setNumberOfContactRecords(allContactRecords.getTotalSize());
         this.allContactRecords = allContactRecords;
     }
 

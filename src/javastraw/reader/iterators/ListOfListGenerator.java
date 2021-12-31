@@ -72,12 +72,8 @@ public class ListOfListGenerator {
 
             if (shouldFitInMemory) {
                 BigContactRecordList allContactRecords = populateListOfLists(ic0);
-                long numOfContactRecords = allContactRecords.getTotalSize();
-
-                IteratorContainer newIC = new ListOfListIteratorContainer(allContactRecords,
-                        ic0.getMatrixSize(),
-                        numOfContactRecords);
-                return newIC;
+                return new ListOfListIteratorContainer(allContactRecords,
+                        ic0.getMatrixSize());
             }
         } catch (Exception e) {
             System.err.println(e.getLocalizedMessage());

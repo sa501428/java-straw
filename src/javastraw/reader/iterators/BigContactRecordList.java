@@ -31,7 +31,7 @@ import java.util.*;
 
 public class BigContactRecordList {
 
-    private static final int MAX_LIMIT = Integer.MAX_VALUE - 10;
+    public static final int MAX_LIMIT = Integer.MAX_VALUE - 10;
     private List<List<ContactRecord>> internalList = new ArrayList<>();
     private long numOfContactRecords = 0;
 
@@ -49,6 +49,14 @@ public class BigContactRecordList {
             }
         }
         if (tempList.size() > 0) {
+            allRecords.addSubList(tempList);
+        }
+        return allRecords;
+    }
+
+    public static BigContactRecordList populateFromListOfLists(List<List<ContactRecord>> allContactLists) {
+        BigContactRecordList allRecords = new BigContactRecordList();
+        for (List<ContactRecord> tempList : allContactLists) {
             allRecords.addSubList(tempList);
         }
         return allRecords;

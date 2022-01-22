@@ -292,26 +292,8 @@ public class HiCFileTools {
             for (Block b : blocks) {
                 if (b != null) {
                     for (ContactRecord rec : b.getContactRecords()) {
-
-                        int relativeX = rec.getBinX() - binXStart;
-                        int relativeY = rec.getBinY() - binYStart;
-
-                        if (relativeX >= 0 && relativeX < numRows) {
-                            if (relativeY >= 0 && relativeY < numCols) {
-                                data[relativeX][relativeY] = rec.getCounts();
-                            }
-                        }
-
-                        if (fillUnderDiagonal) {
-                            relativeX = rec.getBinY() - binXStart;
-                            relativeY = rec.getBinX() - binYStart;
-
-                            if (relativeX >= 0 && relativeX < numRows) {
-                                if (relativeY >= 0 && relativeY < numCols) {
-                                    data[relativeX][relativeY] = rec.getCounts();
-                                }
-                            }
-                        }
+                        fillInMatrixWithRecords(binXStart, binYStart, numRows, numCols,
+                                fillUnderDiagonal, data, rec);
                     }
                 }
             }
@@ -323,14 +305,36 @@ public class HiCFileTools {
         return data;
     }
 
+    public static void fillInMatrixWithRecords(int binXStart, int binYStart, int numRows, int numCols, boolean fillUnderDiagonal, float[][] data, ContactRecord rec) {
+        int relativeX = rec.getBinX() - binXStart;
+        int relativeY = rec.getBinY() - binYStart;
+
+        if (relativeX >= 0 && relativeX < numRows) {
+            if (relativeY >= 0 && relativeY < numCols) {
+                data[relativeX][relativeY] = rec.getCounts();
+            }
+        }
+
+        if (fillUnderDiagonal) {
+            relativeX = rec.getBinY() - binXStart;
+            relativeY = rec.getBinX() - binYStart;
+
+            if (relativeX >= 0 && relativeX < numRows) {
+                if (relativeY >= 0 && relativeY < numCols) {
+                    data[relativeX][relativeY] = rec.getCounts();
+                }
+            }
+        }
+    }
+
     public static List<Block> getAllRegionBlocks(MatrixZoomData zd, long binXStart, long binXEnd,
                                                  long binYStart, long binYEnd,
                                                  NormalizationType normalizationType, boolean fillUnderDiagonal) throws IOException {
 
         List<Block> blocks = Collections.synchronizedList(new ArrayList<>());
-        
+
         int numDataReadingErrors = 0;
-        
+
         try {
             blocks.addAll(zd.getNormalizedBlocksOverlapping(binXStart, binYStart, binXEnd, binYEnd, normalizationType, false, fillUnderDiagonal));
         } catch (Exception e) {

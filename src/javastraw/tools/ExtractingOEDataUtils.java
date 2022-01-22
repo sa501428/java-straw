@@ -29,9 +29,9 @@ import javastraw.reader.block.ContactRecord;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.type.NormalizationType;
-import org.apache.commons.math3.linear.RealMatrix;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 public class ExtractingOEDataUtils {
@@ -82,118 +82,80 @@ public class ExtractingOEDataUtils {
             System.err.println("DF is null");
             return null;
         }
+
+        List<ContactRecord> records = getOEBlocks(zd, binXStart, binXEnd, binYStart, binYEnd,
+                normalizationType, isIntraFillUnderDiagonal, df, chrIndex, pseudocount, thresholdType,
+                threshold, invalidReplacement);
+
         // numRows/numCols is just to ensure a set size in case bounds are approximate
         // left upper corner is reference for 0,0
-        List<Block> blocks = HiCFileTools.getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd, normalizationType, isIntraFillUnderDiagonal);
         float[][] data = new float[numRows][numCols];
-
-        double averageCount = zd.getAverageCount() / 2;
-        if (blocks.size() > 0) {
-            for (Block b : blocks) {
-                if (b != null) {
-                    for (ContactRecord rec : b.getContactRecords()) {
-                        double expected = getExpected(rec, df, chrIndex, isIntraFillUnderDiagonal, averageCount);
-                        double val = rec.getCounts();
-
-                        double observed = val + pseudocount;
-                        expected = expected + pseudocount;
-                        double answer = Double.NaN;
-
-                        if (thresholdType.equals(ThresholdType.LOG_BASE_EXP_OF_OBS)) {
-
-                            answer = (Math.log(observed) / Math.log(expected));
-
-                        } else if (thresholdType.equals(ThresholdType.TRUE_OE_LOG)
-                                || thresholdType.equals(ThresholdType.LOG_OE_BOUNDED)
-                                || thresholdType.equals(ThresholdType.LOG_OE_BOUNDED_SCALED_BTWN_ZERO_ONE)) {
-
-                            answer = Math.log(observed / expected);
-                            if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED)) {
-                                answer = Math.min(Math.max(-threshold, answer), threshold);
-                            } else if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED_SCALED_BTWN_ZERO_ONE)) {
-                                answer = Math.min(Math.max(-threshold, answer), threshold);
-                                answer = (answer + threshold) / (2 * threshold);
-                            }
-                        } else if (thresholdType.equals(ThresholdType.TRUE_OE)
-                                || thresholdType.equals(ThresholdType.TRUE_OE_LINEAR)) {
-                            answer = observed / expected;
-                            if (thresholdType.equals(ThresholdType.TRUE_OE_LINEAR)) {
-                                if (answer < 1) {
-                                    answer = 1 - 1 / answer;
-                                } else {
-                                    answer -= 1;
-                                }
-                            }
-                        }
-
-                        float floatAnswer = (float) answer;
-                        if (Float.isNaN(floatAnswer) || Float.isInfinite(floatAnswer)) {
-                            floatAnswer = invalidReplacement;
-                        }
-
-                        placeOEValInRelativePosition(floatAnswer, rec, binXStart, binYStart, numRows, numCols, data, isIntraFillUnderDiagonal);
-                    }
-                }
-            }
+        for (ContactRecord rec : records) {
+            HiCFileTools.fillInMatrixWithRecords(binXStart, binYStart, numRows, numCols, isIntraFillUnderDiagonal, data, rec);
         }
         // force cleanup
-        blocks = null;
+        records = null;
         return data;
     }
 
-    /**
-     * place oe value in relative position
-     *
-     * @param oeVal
-     * @param rec
-     * @param binXStart
-     * @param binYStart
-     * @param numRows
-     * @param numCols
-     * @param data
-     */
-    private static void placeOEValInRelativePosition(double oeVal, ContactRecord rec, int binXStart, int binYStart,
-                                                     int numRows, int numCols, RealMatrix data, boolean isIntra) {
-        int relativeX = rec.getBinX() - binXStart;
-        int relativeY = rec.getBinY() - binYStart;
-        if (relativeX >= 0 && relativeX < numRows) {
-            if (relativeY >= 0 && relativeY < numCols) {
-                data.addToEntry(relativeX, relativeY, oeVal);
-            }
-        }
+    private static List<ContactRecord> getOEBlocks(MatrixZoomData zd, int binXStart, int binXEnd,
+                                                   int binYStart, int binYEnd, NormalizationType normalizationType,
+                                                   boolean isIntraFillUnderDiagonal, ExpectedValueFunction df,
+                                                   int chrIndex, float pseudocount, ThresholdType thresholdType,
+                                                   double threshold, float invalidReplacement) throws IOException {
+        List<Block> blocks = HiCFileTools.getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd,
+                normalizationType, isIntraFillUnderDiagonal);
+        List<ContactRecord> records = new ArrayList<>();
 
-        if (isIntra) {
-            // check if the other half of matrix should also be displayed/passed in
-            relativeX = rec.getBinY() - binXStart;
-            relativeY = rec.getBinX() - binYStart;
-            if (relativeX >= 0 && relativeX < numRows) {
-                if (relativeY >= 0 && relativeY < numCols) {
-                    data.addToEntry(relativeX, relativeY, oeVal);
+        for (Block b : blocks) {
+            if (b != null) {
+                for (ContactRecord rec : b.getContactRecords()) {
+                    double expected = getExpected(rec, df, chrIndex, isIntraFillUnderDiagonal, zd.getAverageCount());
+                    double val = rec.getCounts();
+
+                    double observed = val + pseudocount;
+                    expected = expected + pseudocount;
+                    double answer = Double.NaN;
+
+                    if (thresholdType.equals(ThresholdType.LOG_BASE_EXP_OF_OBS)) {
+
+                        answer = (Math.log(observed) / Math.log(expected));
+
+                    } else if (thresholdType.equals(ThresholdType.TRUE_OE_LOG)
+                            || thresholdType.equals(ThresholdType.LOG_OE_BOUNDED)
+                            || thresholdType.equals(ThresholdType.LOG_OE_BOUNDED_SCALED_BTWN_ZERO_ONE)) {
+
+                        answer = Math.log(observed / expected);
+                        if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED)) {
+                            answer = Math.min(Math.max(-threshold, answer), threshold);
+                        } else if (thresholdType.equals(ThresholdType.LOG_OE_BOUNDED_SCALED_BTWN_ZERO_ONE)) {
+                            answer = Math.min(Math.max(-threshold, answer), threshold);
+                            answer = (answer + threshold) / (2 * threshold);
+                        }
+                    } else if (thresholdType.equals(ThresholdType.TRUE_OE)
+                            || thresholdType.equals(ThresholdType.TRUE_OE_LINEAR)) {
+                        answer = observed / expected;
+                        if (thresholdType.equals(ThresholdType.TRUE_OE_LINEAR)) {
+                            if (answer < 1) {
+                                answer = 1 - 1 / answer;
+                            } else {
+                                answer -= 1;
+                            }
+                        }
+                    }
+
+                    float floatAnswer = (float) answer;
+                    if (Float.isNaN(floatAnswer) || Float.isInfinite(floatAnswer)) {
+                        floatAnswer = invalidReplacement;
+                    }
+
+                    records.add(new ContactRecord(rec.getBinX(), rec.getBinY(), floatAnswer));
+
                 }
             }
         }
-    }
-
-    private static void placeOEValInRelativePosition(float oeVal, ContactRecord rec, int binXStart, int binYStart,
-                                                     int numRows, int numCols, float[][] data, boolean isIntra) {
-        int relativeX = rec.getBinX() - binXStart;
-        int relativeY = rec.getBinY() - binYStart;
-        if (relativeX >= 0 && relativeX < numRows) {
-            if (relativeY >= 0 && relativeY < numCols) {
-                data[relativeX][relativeY] = oeVal;
-            }
-        }
-
-        if (isIntra) {
-            // check if the other half of matrix should also be displayed/passed in
-            relativeX = rec.getBinY() - binXStart;
-            relativeY = rec.getBinX() - binYStart;
-            if (relativeX >= 0 && relativeX < numRows) {
-                if (relativeY >= 0 && relativeY < numCols) {
-                    data[relativeX][relativeY] = oeVal;
-                }
-            }
-        }
+        blocks = null;
+        return records;
     }
 
     private static double getExpected(ContactRecord rec, ExpectedValueFunction df, int chrIndex, boolean isIntra, double averageCount) {

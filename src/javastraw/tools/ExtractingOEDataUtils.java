@@ -98,11 +98,11 @@ public class ExtractingOEDataUtils {
         return data;
     }
 
-    private static List<ContactRecord> getOEBlocks(MatrixZoomData zd, int binXStart, int binXEnd,
-                                                   int binYStart, int binYEnd, NormalizationType normalizationType,
-                                                   boolean isIntraFillUnderDiagonal, ExpectedValueFunction df,
-                                                   int chrIndex, float pseudocount, ThresholdType thresholdType,
-                                                   double threshold, float invalidReplacement) throws IOException {
+    public static List<ContactRecord> getOEBlocks(MatrixZoomData zd, int binXStart, int binXEnd,
+                                                  int binYStart, int binYEnd, NormalizationType normalizationType,
+                                                  boolean isIntraFillUnderDiagonal, ExpectedValueFunction df,
+                                                  int chrIndex, float pseudocount, ThresholdType thresholdType,
+                                                  double threshold, float invalidReplacement) throws IOException {
         List<Block> blocks = HiCFileTools.getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd,
                 normalizationType, isIntraFillUnderDiagonal);
         List<ContactRecord> records = new ArrayList<>();

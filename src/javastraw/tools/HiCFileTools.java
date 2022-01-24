@@ -305,7 +305,8 @@ public class HiCFileTools {
         return data;
     }
 
-    public static void fillInMatrixWithRecords(int binXStart, int binYStart, int numRows, int numCols, boolean fillUnderDiagonal, float[][] data, ContactRecord rec) {
+    public static void fillInMatrixWithRecords(int binXStart, int binYStart, int numRows, int numCols,
+                                               boolean fillUnderDiagonal, float[][] data, ContactRecord rec) {
         int relativeX = rec.getBinX() - binXStart;
         int relativeY = rec.getBinY() - binYStart;
 
@@ -336,7 +337,8 @@ public class HiCFileTools {
         int numDataReadingErrors = 0;
 
         try {
-            blocks.addAll(zd.getNormalizedBlocksOverlapping(binXStart, binYStart, binXEnd, binYEnd, normalizationType, false, fillUnderDiagonal));
+            blocks.addAll(zd.getNormalizedBlocksOverlapping(binXStart, binYStart, binXEnd, binYEnd, normalizationType,
+                    false, fillUnderDiagonal));
         } catch (Exception e) {
             triggerNormError(normalizationType);
             if (StrawGlobals.printVerboseComments) {
@@ -423,13 +425,14 @@ public class HiCFileTools {
 
     public static float[][] getOEMatrixForChromosome(Dataset ds, Chromosome chromosome, int resolution, NormalizationType norm,
                                                      double logThreshold, ExtractingOEDataUtils.ThresholdType thresholdType,
-                                                     boolean fillUnderDiagonal, float pseudocount, float invalidReplacement,
-                                                     boolean getCorrectedVersion) throws IOException {
+                                                     boolean isIntra, boolean fillUnderDiagonal, float pseudocount,
+                                                     float invalidReplacement, boolean getCorrectedVersion) throws IOException {
 
         final MatrixZoomData zd = getMatrixZoomData(ds, chromosome, chromosome, resolution);
         if (zd == null) return null;
 
-        return getOEMatrixForChromosome(ds, zd, chromosome, resolution, norm, logThreshold, thresholdType, fillUnderDiagonal,
+        return getOEMatrixForChromosome(ds, zd, chromosome, resolution, norm, logThreshold, thresholdType,
+                isIntra, fillUnderDiagonal,
                 pseudocount, invalidReplacement, getCorrectedVersion);
 
     }
@@ -437,7 +440,7 @@ public class HiCFileTools {
     public static float[][] getOEMatrixForChromosome(Dataset ds, MatrixZoomData zd, Chromosome chromosome,
                                                      int resolution, NormalizationType norm, double logThreshold,
                                                      ExtractingOEDataUtils.ThresholdType thresholdType,
-                                                     boolean fillUnderDiagonal, float pseudocount,
+                                                     boolean isIntra, boolean fillUnderDiagonal, float pseudocount,
                                                      float invalidReplacement, boolean getCorrectedVersion) throws IOException {
 
         ExpectedValueFunction df = ds.getExpectedValuesOrExit(zd.getZoom(), norm, chromosome, true, getCorrectedVersion);
@@ -446,7 +449,7 @@ public class HiCFileTools {
 
         return ExtractingOEDataUtils.extractObsOverExpBoundedRegion(zd, 0, maxBin,
                 0, maxBin, maxBin, maxBin, norm, df, chromosome.getIndex(), logThreshold,
-                fillUnderDiagonal, thresholdType, pseudocount, invalidReplacement);
+                isIntra, fillUnderDiagonal, thresholdType, pseudocount, invalidReplacement);
 
     }
 }

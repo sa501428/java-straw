@@ -76,22 +76,23 @@ public class ExtractingOEDataUtils {
                                                            int binYStart, int binYEnd, int numRows, int numCols,
                                                            NormalizationType normalizationType,
                                                            ExpectedValueFunction df, int chrIndex, double threshold,
-                                                           boolean isIntraFillUnderDiagonal, ThresholdType thresholdType,
+                                                           boolean isIntra, boolean fillUnderDiagonal, ThresholdType thresholdType,
                                                            float pseudocount, float invalidReplacement) throws IOException {
-        if (isIntraFillUnderDiagonal && df == null) {
+        if (isIntra && df == null) {
             System.err.println("DF is null");
             return null;
         }
 
         List<ContactRecord> records = getOEBlocks(zd, binXStart, binXEnd, binYStart, binYEnd,
-                normalizationType, isIntraFillUnderDiagonal, df, chrIndex, pseudocount, thresholdType,
+                normalizationType, isIntra, fillUnderDiagonal, df, chrIndex, pseudocount, thresholdType,
                 threshold, invalidReplacement);
 
         // numRows/numCols is just to ensure a set size in case bounds are approximate
         // left upper corner is reference for 0,0
         float[][] data = new float[numRows][numCols];
         for (ContactRecord rec : records) {
-            HiCFileTools.fillInMatrixWithRecords(binXStart, binYStart, numRows, numCols, isIntraFillUnderDiagonal, data, rec);
+            HiCFileTools.fillInMatrixWithRecords(binXStart, binYStart, numRows, numCols,
+                    fillUnderDiagonal, data, rec);
         }
         // force cleanup
         records = null;
@@ -100,17 +101,17 @@ public class ExtractingOEDataUtils {
 
     public static List<ContactRecord> getOEBlocks(MatrixZoomData zd, int binXStart, int binXEnd,
                                                   int binYStart, int binYEnd, NormalizationType normalizationType,
-                                                  boolean isIntraFillUnderDiagonal, ExpectedValueFunction df,
+                                                  boolean isIntra, boolean fillUnderDiagonal, ExpectedValueFunction df,
                                                   int chrIndex, float pseudocount, ThresholdType thresholdType,
                                                   double threshold, float invalidReplacement) throws IOException {
         List<Block> blocks = HiCFileTools.getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd,
-                normalizationType, isIntraFillUnderDiagonal);
+                normalizationType, fillUnderDiagonal);
         List<ContactRecord> records = new ArrayList<>();
 
         for (Block b : blocks) {
             if (b != null) {
                 for (ContactRecord rec : b.getContactRecords()) {
-                    double expected = getExpected(rec, df, chrIndex, isIntraFillUnderDiagonal, zd.getAverageCount());
+                    double expected = getExpected(rec, df, chrIndex, isIntra, zd.getAverageCount());
                     double val = rec.getCounts();
 
                     double observed = val + pseudocount;
@@ -158,7 +159,8 @@ public class ExtractingOEDataUtils {
         return records;
     }
 
-    private static double getExpected(ContactRecord rec, ExpectedValueFunction df, int chrIndex, boolean isIntra, double averageCount) {
+    private static double getExpected(ContactRecord rec, ExpectedValueFunction df, int chrIndex,
+                                      boolean isIntra, double averageCount) {
         int x = rec.getBinX();
         int y = rec.getBinY();
         double expected;

@@ -74,7 +74,12 @@ public class ContactRecord implements Comparable<ContactRecord> {
             return binX - contactRecord.binX;
         } else if (this.binY != contactRecord.binY) {
             return binY - contactRecord.binY;
-        } else return 0;
+        } else {
+            float val = counts - contactRecord.counts;
+            if (val > 0) return 1;
+            if (val < 0) return -1;
+            return 0;
+        }
     }
 
     public String toString() {

@@ -25,7 +25,7 @@
 package javastraw;
 
 public class StrawGlobals {
-    public static final String versionNum = "2.06.00";
+    public static final String versionNum = "2.06.01";
     // min hic file version supported
     public static final int minVersion = 6;
     public static final int bufferSize = 2097152;

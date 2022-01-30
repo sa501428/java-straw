@@ -37,6 +37,12 @@ public class HiCZoom implements Comparable<HiCZoom> {
         this.binSize = binSize;
     }
 
+    // can assume this default given FRAG resolution is no longer used
+    public HiCZoom(int binSize) {
+        this.unit = HiCUnit.BP;
+        this.binSize = binSize;
+    }
+
     @SuppressWarnings("MethodDoesntCallSuperMethod")
     public HiCZoom clone() {
         return new HiCZoom(unit, binSize);

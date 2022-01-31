@@ -38,27 +38,37 @@ public class ChromosomeHandler {
     private final Map<String, Chromosome> chromosomeMap = new HashMap<>();
     private final List<Chromosome> cleanedChromosomes;
     private final String genomeID;
-    private final int[] chromosomeBoundaries;
+    private final long[] chromosomeBoundaries;
     private final Chromosome[] chromosomesArray;
     private final Chromosome[] chromosomeArrayWithoutAllByAll;
     private final Chromosome[] chromosomeArrayAutosomesOnly;
 
-    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID) {
-        this(chromosomes, genomeID, true);
+    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean inferID) {
+        this(chromosomes, genomeID, inferID, true);
     }
 
-    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean setAllChr) {
+    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean inferID, boolean createAllChr) {
 
-        this.genomeID = genomeID;
+        if (inferID) {
+            String inferGenomeId = inferGenomeId();
+            // if cannot find matching genomeID, set based on file
+            if (inferGenomeId != null) {
+                this.genomeID = inferGenomeId;
+            } else {
+                this.genomeID = genomeID;
+            }
+        } else {
+            this.genomeID = genomeID;
+        }
 
         // set the global chromosome list
-        if (setAllChr) {
+        if (createAllChr) {
             long genomeLength = getTotalLengthOfAllChromosomes(chromosomes);
             chromosomes.set(0, new Chromosome(0, cleanUpName(CHR_ALL), (int) (genomeLength / 1000)));
         }
 
         cleanedChromosomes = initializeCleanedChromosomesList(chromosomes);
-        Pair<int[], List<Chromosome[]>> outputs = initializeInternalVariables();
+        Pair<long[], List<Chromosome[]>> outputs = initializeInternalVariables();
         chromosomeBoundaries = outputs.getFirst();
         chromosomesArray = outputs.getSecond().get(0);
         chromosomeArrayWithoutAllByAll = outputs.getSecond().get(1);
@@ -97,13 +107,7 @@ public class ChromosomeHandler {
     }
 
     public String cleanUpName(String name) {
-        if (name.equalsIgnoreCase("assembly")) {
-            return "assembly";
-        }
-        if (name.equalsIgnoreCase("pseudoassembly")) {
-            return "pseudoassembly";
-        }
-        if (genomeID.equalsIgnoreCase("hg19") || genomeID.equalsIgnoreCase("hg38")) {
+        if (genomeID.equalsIgnoreCase("hg19")) {
             return name.trim().toLowerCase().replaceAll("chr", "").toUpperCase();
         }
         return name;
@@ -138,16 +142,14 @@ public class ChromosomeHandler {
     private List<Chromosome> initializeCleanedChromosomesList(List<Chromosome> chromosomes) {
         List<Chromosome> cleanedChromosomes = new ArrayList<>();
         for (Chromosome c : chromosomes) {
-            if (c != null) {
-                String cleanName = cleanUpName(c.getName());
-                Chromosome cleanChromosome = new Chromosome(c.getIndex(), cleanName, c.getLength());
-                cleanedChromosomes.add(cleanChromosome);
-            }
+            String cleanName = cleanUpName(c.getName());
+            Chromosome cleanChromosome = new Chromosome(c.getIndex(), cleanName, c.getLength());
+            cleanedChromosomes.add(cleanChromosome);
         }
         return cleanedChromosomes;
     }
 
-    private Pair<int[], List<Chromosome[]>> initializeInternalVariables() {
+    private Pair<long[], List<Chromosome[]>> initializeInternalVariables() {
 
         for (Chromosome c : cleanedChromosomes) {
             chromosomeMap.put(c.getName(), c);
@@ -157,12 +159,12 @@ public class ChromosomeHandler {
         }
 
         // for all-by-all view
-        int[] chromosomeBoundaries = new int[cleanedChromosomes.size() - 1];
+        long[] chromosomeBoundaries = new long[cleanedChromosomes.size() - 1];
         long bound = 0;
         for (int i = 1; i < cleanedChromosomes.size(); i++) {
             Chromosome c = cleanedChromosomes.get(i);
             bound += (c.getLength() / 1000);
-            chromosomeBoundaries[i - 1] = (int) bound;
+            chromosomeBoundaries[i - 1] = bound;
         }
 
         Chromosome[] chromosomesArray = cleanedChromosomes.toArray(new Chromosome[cleanedChromosomes.size()]);
@@ -235,7 +237,7 @@ public class ChromosomeHandler {
         return chromosomesArray.length;
     }
 
-    public int[] getChromosomeBoundaries() {
+    public long[] getChromosomeBoundaries() {
         return chromosomeBoundaries;
     }
 
@@ -271,6 +273,32 @@ public class ChromosomeHandler {
 
     public Chromosome[] getChromosomeArrayWithoutAllByAll() {
         return chromosomeArrayWithoutAllByAll;
+    }
+
+    public String inferGenomeId() {
+        List<String> chrom_sizes = Arrays.asList("hg19", "hg38", "b37", "hg18", "mm10", "mm9", "GRCm38", "aedAeg1",
+                "anasPlat1", "assembly", "bTaurus3", "calJac3", "canFam3", "capHir1", "dm3", "dMel", "EBV", "equCab2",
+                "felCat8", "galGal4", "hg18", "loxAfr3", "macMul1", "macMulBaylor", "oryCun2", "oryLat2", "panTro4",
+                "Pf3D7", "ratNor5", "ratNor6", "sacCer3", "sCerS288c", "spretus", "susScr3", "TAIR10");
+
+        for (String id : chrom_sizes) {
+            ChromosomeHandler handler = ChromosomeTools.loadChromosomes(id);
+            for (Chromosome chr : handler.cleanedChromosomes) {
+                for (Chromosome chr2 : this.cleanedChromosomes) {
+                    if (!chr.getName().equalsIgnoreCase("ALL") &&
+                            chr.getName().equals(chr2.getName()) &&
+                            chr.getLength() == chr2.getLength()) {
+                        return id;
+                    }
+                }
+            }
+            // this is more elegant but there's a problem with the Chromosome hashCode
+            //ChromosomeHandler handler1 = this.getIntersectionWith(handler);
+            //if (handler1 != null && handler1.size() > 1) {
+            //    return id;
+            //}
+        }
+        return null;
     }
 
     public Chromosome[] extractOddOrEvenAutosomes(boolean extractOdd) {

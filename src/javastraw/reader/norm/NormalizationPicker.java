@@ -6,7 +6,7 @@ import javastraw.reader.type.NormalizationType;
 import java.util.Arrays;
 import java.util.Map;
 
-public class NormalizationHandler {
+public class NormalizationPicker {
     public static NormalizationType getFirstValidNormInThisOrder(Dataset ds, String[] norms) {
         Map<String, NormalizationType> normsForDataset = ds.getNormalizationTypesMap();
 

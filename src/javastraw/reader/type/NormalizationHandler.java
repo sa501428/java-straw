@@ -90,6 +90,14 @@ public class NormalizationHandler {
         return norm.equals(INTER_KR) || norm.equals(INTER_VC) || norm.equals(INTER_SCALE);
     }
 
+    public static Integer getIdealResolutionLimit(NormalizationType normalizationType) {
+        if (isGenomeWideNorm(normalizationType)) {
+            return 25000;
+        } else {
+            return 0;
+        }
+    }
+
     public NormalizationType getNormTypeFromString(String text) {
         if (text != null && text.length() > 0) {
             for (NormalizationType norm : currentlyAvailableNorms) {
@@ -107,8 +115,9 @@ public class NormalizationHandler {
         List<NormalizationType> normalizationTypes = new ArrayList<>();
         normalizationTypes.add(VC);
         normalizationTypes.add(VC_SQRT);
-        normalizationTypes.add(KR);
         normalizationTypes.add(SCALE);
+        normalizationTypes.add(INTER_SCALE);
+        normalizationTypes.add(GW_SCALE);
         return normalizationTypes;
     }
 }

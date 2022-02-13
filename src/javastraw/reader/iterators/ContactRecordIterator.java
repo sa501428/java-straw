@@ -27,7 +27,8 @@ package javastraw.reader.iterators;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.block.Block;
 import javastraw.reader.block.ContactRecord;
-import javastraw.reader.mzd.MatrixZoomData;
+import javastraw.reader.mzd.BlockLoader;
+import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
 import org.broad.igv.util.collections.LRUCache;
 
@@ -44,20 +45,25 @@ class ContactRecordIterator implements Iterator<ContactRecord> {
     private int blockIdx;
     private Iterator<ContactRecord> currentBlockIterator;
     private final DatasetReader reader;
-    private final MatrixZoomData zd;
+    private final String zdKey;
     private final LRUCache<String, Block> blockCache;
     private final boolean useCache;
+    private final int chr1Idx, chr2Idx;
+    private final HiCZoom zoom;
 
     /**
      * Initializes the iterator
      */
-    ContactRecordIterator(DatasetReader reader, MatrixZoomData zd, LRUCache<String, Block> blockCache,
-                          boolean useCache) {
+    ContactRecordIterator(DatasetReader reader, String zdKey, LRUCache<String, Block> blockCache,
+                          boolean useCache, int chr1Idx, int chr2Idx, HiCZoom zoom) {
         this.reader = reader;
-        this.zd = zd;
+        this.zdKey = zdKey;
+        this.chr1Idx = chr1Idx;
+        this.chr2Idx = chr2Idx;
+        this.zoom = zoom;
         this.blockCache = blockCache;
         this.blockIdx = -1;
-        this.blockNumbers = reader.getBlockNumbers(zd);
+        this.blockNumbers = reader.getBlockNumbers(zdKey);
         this.useCache = useCache;
     }
 
@@ -79,12 +85,13 @@ class ContactRecordIterator implements Iterator<ContactRecord> {
                     int blockNumber = blockNumbers.get(blockIdx);
 
                     // Optionally check the cache
-                    String key = zd.getBlockKey(blockNumber, NormalizationHandler.NONE);
+                    String key = BlockLoader.getBlockKey(zdKey, blockNumber, NormalizationHandler.NONE);
                     Block nextBlock;
                     if (useCache && blockCache.containsKey(key)) {
                         nextBlock = blockCache.get(key);
                     } else {
-                        nextBlock = reader.readNormalizedBlock(blockNumber, zd, NormalizationHandler.NONE);
+                        nextBlock = reader.readNormalizedBlock(blockNumber, zdKey, NormalizationHandler.NONE,
+                                chr1Idx, chr2Idx, zoom);
                     }
                     currentBlockIterator = nextBlock.getContactRecords().iterator();
                     return true;

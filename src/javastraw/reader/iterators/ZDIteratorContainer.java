@@ -62,7 +62,8 @@ public class ZDIteratorContainer extends IteratorContainer {
 
     @Override
     public Iterator<ContactRecord> getNewContactRecordIterator() {
-        return new ContactRecordIterator(reader, zd, blockCache, useCache);
+        return new ContactRecordIterator(reader, zd.getKey(), blockCache, useCache,
+                zd.getChr1Idx(), zd.getChr2Idx(), zd.getZoom());
     }
 
     @Override

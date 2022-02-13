@@ -41,14 +41,9 @@ import javastraw.reader.iterators.ZDIteratorContainer;
 import javastraw.reader.pearsons.PearsonsManager;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
-import javastraw.tools.ParallelizationTools;
 import org.broad.igv.util.collections.LRUCache;
 
-import java.io.IOException;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class MatrixZoomData {
 
@@ -171,20 +166,24 @@ public class MatrixZoomData {
         return blockColumnCount;
     }
 
+    public static String triKey(String s1, String s2, String s3) {
+        return s1 + "_" + s2 + "_" + s3;
+    }
+
     public String getKey() {
-        return chr1.getName() + "_" + chr2.getName() + "_" + zoom.getKey();
+        return triKey(chr1.getName(), chr2.getName(), zoom.getKey());
     }
 
     public String getKey(int chr1, int chr2) {
-        return chr1 + "_" + chr2 + "_" + zoom.getKey();
+        return triKey("" + chr1, "" + chr2, zoom.getKey());
     }
 
     public String getBlockKey(int blockNumber, NormalizationType no) {
-        return getKey() + "_" + blockNumber + "_" + no;
+        return triKey(getKey(), "" + blockNumber, "" + no);
     }
 
     public String getNormLessBlockKey(Block block) {
-        return getKey() + "_" + block.getNumber() + "_" + block.getUniqueRegionID();
+        return triKey(getKey(), "" + block.getNumber(), block.getUniqueRegionID());
     }
 
     public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2,
@@ -199,142 +198,17 @@ public class MatrixZoomData {
                                                       boolean fillUnderDiagonal, BlockModifier modifier) {
         final List<Block> blockList = Collections.synchronizedList(new ArrayList<>());
         if (reader.getVersion() > 8 && isIntra) {
-            return addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, modifier);
+            return V9IntraBlockReader.addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1,
+                    (int) binX2, (int) binY2, no, modifier, blockBinCount, v9Depth,
+                    blockColumnCount, useCache, blockCache, getKey(), chr1, chr2, zoom, reader);
         } else {
-            return addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2, (int) binY2, no, fillUnderDiagonal, modifier);
+            return LegacyVersionBlockReader.addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2,
+                    (int) binY2, no, fillUnderDiagonal, modifier, blockBinCount, blockColumnCount, useCache, blockCache,
+                    getKey(), chr1, chr2, zoom, reader);
         }
     }
 
-    public int getBlockNumberVersion9FromPADAndDepth(int positionAlongDiagonal, int depth) {
-        return depth * blockColumnCount + positionAlongDiagonal;
-    }
 
-    protected void populateBlocksToLoadV9(int positionAlongDiagonal, int depth, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
-        int blockNumber = getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth);
-        String key = getBlockKey(blockNumber, no);
-        Block b;
-        if (useCache && blockCache.containsKey(key)) {
-            b = blockCache.get(key);
-            blockList.add(b);
-        } else {
-            blocksToLoad.add(blockNumber);
-        }
-    }
-
-    protected List<Block> addNormalizedBlocksToListV9(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                      final NormalizationType norm, BlockModifier modifier) {
-
-        Set<Integer> blocksToLoad = new HashSet<>();
-
-        // PAD = positionAlongDiagonal (~projected)
-        // Depth is axis perpendicular to diagonal; nearer means closer to diagonal
-        int translatedLowerPAD = (binX1 + binY1) / 2 / blockBinCount;
-        int translatedHigherPAD = (binX2 + binY2) / 2 / blockBinCount + 1;
-        int translatedNearerDepth = v9Depth.getDepth(binX1, binY2);
-        int translatedFurtherDepth = v9Depth.getDepth(binX2, binY1);
-
-        // because code above assume above diagonal; but we could be below diagonal
-        int nearerDepth = Math.min(translatedNearerDepth, translatedFurtherDepth);
-        if ((binX1 > binY2 && binX2 < binY1) || (binX2 > binY1 && binX1 < binY2)) {
-            nearerDepth = 0;
-        }
-        int furtherDepth = Math.max(translatedNearerDepth, translatedFurtherDepth) + 1; // +1; integer divide rounds down
-
-
-        for (int depth = nearerDepth; depth <= furtherDepth; depth++) {
-            for (int pad = translatedLowerPAD; pad <= translatedHigherPAD; pad++) {
-                populateBlocksToLoadV9(pad, depth, norm, blockList, blocksToLoad);
-            }
-        }
-
-        actuallyLoadGivenBlocks(blockList, blocksToLoad, norm, modifier);
-
-        return new ArrayList<>(new HashSet<>(blockList));
-    }
-
-    protected void populateBlocksToLoad(int r, int c, NormalizationType no, List<Block> blockList, Set<Integer> blocksToLoad) {
-        int blockNumber = r * getBlockColumnCount() + c;
-        String key = getBlockKey(blockNumber, no);
-        Block b;
-        if (useCache && blockCache.containsKey(key)) {
-            b = blockCache.get(key);
-            blockList.add(b);
-        } else {
-            blocksToLoad.add(blockNumber);
-        }
-    }
-
-    /**
-     * Return the blocks of normalized, observed values overlapping the rectangular region specified.
-     *
-     * @param binY1 leftmost position in "bins"
-     * @param binX2 rightmost position in "bins"
-     * @param binY2 bottom position in "bins"
-     * @param norm  normalization type
-     * @return List of overlapping blocks, normalized
-     */
-    protected List<Block> addNormalizedBlocksToList(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
-                                                    final NormalizationType norm, boolean getBelowDiagonal, BlockModifier modifier) {
-
-        Set<Integer> blocksToLoad = new HashSet<>();
-
-        // have to do this regardless (just in case)
-        int col1 = binX1 / blockBinCount;
-        int row1 = binY1 / blockBinCount;
-        int col2 = binX2 / blockBinCount;
-        int row2 = binY2 / blockBinCount;
-
-        for (int r = row1; r <= row2; r++) {
-            for (int c = col1; c <= col2; c++) {
-                populateBlocksToLoad(r, c, norm, blockList, blocksToLoad);
-            }
-        }
-
-        if (getBelowDiagonal && binY1 < binX2) {
-            for (int r = row1; r <= row2; r++) {
-                for (int c = col1; c <= col2; c++) {
-                    populateBlocksToLoad(c, r, norm, blockList, blocksToLoad);
-                }
-            }
-        }
-
-        actuallyLoadGivenBlocks(blockList, blocksToLoad, norm, modifier);
-
-        return new ArrayList<>(new HashSet<>(blockList));
-    }
-
-    protected void actuallyLoadGivenBlocks(final List<Block> blockList, Set<Integer> blocksToLoad,
-                                           final NormalizationType no, BlockModifier modifier) {
-        final AtomicInteger errorCounter = new AtomicInteger();
-
-        ExecutorService service = Executors.newFixedThreadPool(200);
-        for (final int blockNumber : blocksToLoad) {
-            String key = getBlockKey(blockNumber, no);
-            readBlockUpdateListAndCache(blockNumber, reader, no, blockList, key, errorCounter, service, modifier);
-        }
-        ParallelizationTools.shutDownServiceAndWait(service, errorCounter);
-    }
-
-    protected void readBlockUpdateListAndCache(int blockNumber, DatasetReader reader, NormalizationType no,
-                                               List<Block> blockList, String key, final AtomicInteger errorCounter,
-                                               ExecutorService service, BlockModifier modifier) {
-        Runnable loader = () -> {
-            try {
-                Block b = reader.readNormalizedBlock(blockNumber, MatrixZoomData.this, no);
-                if (b == null) {
-                    b = new Block(blockNumber, key);
-                }
-                b = modifier.modify(b, key, getBinSize(), getChr1(), getChr2());
-                if (useCache) {
-                    blockCache.put(key, b);
-                }
-                blockList.add(b);
-            } catch (IOException e) {
-                errorCounter.incrementAndGet();
-            }
-        };
-        service.submit(loader);
-    }
 
     /**
      * Utility for printing description of this matrix.

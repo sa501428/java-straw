@@ -33,6 +33,7 @@ import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.block.*;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.expected.ExpectedValueFunction;
+import javastraw.reader.mzd.BlockLoader;
 import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
@@ -533,8 +534,8 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     @Override
-    public List<Integer> getBlockNumbers(MatrixZoomData zd) {
-        BlockIndex blockIndex = blockIndexMap.get(zd.getKey());
+    public List<Integer> getBlockNumbers(String zdKey) {
+        BlockIndex blockIndex = blockIndexMap.get(zdKey);
         return blockIndex == null ? null : blockIndex.getBlockNumbers();
     }
 
@@ -616,22 +617,23 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     @Override
-    public Block readNormalizedBlock(int blockNumber, MatrixZoomData zd, NormalizationType no) throws IOException {
+    public Block readNormalizedBlock(int blockNumber, String zdKey, NormalizationType no,
+                                     int chr1Index, int chr2Index, HiCZoom zoom) throws IOException {
 
         if (no == null) {
             throw new IOException("Norm " + no + " is null");
         } else if (no.equals(NormalizationHandler.NONE)) {
-            return readBlock(blockNumber, zd);
+            return readBlock(blockNumber, zdKey);
         } else {
             long[] timeDiffThings = new long[4];
             timeDiffThings[0] = System.currentTimeMillis();
 
-            NormalizationVector nv1 = dataset.getNormalizationVector(zd.getChr1Idx(), zd.getZoom(), no);
-            NormalizationVector nv2 = dataset.getNormalizationVector(zd.getChr2Idx(), zd.getZoom(), no);
+            NormalizationVector nv1 = dataset.getNormalizationVector(chr1Index, zoom, no);
+            NormalizationVector nv2 = dataset.getNormalizationVector(chr2Index, zoom, no);
 
             if (nv1 == null || nv2 == null) {
                 if (StrawGlobals.printVerboseComments) { // todo should this print an error always instead?
-                    System.err.println("Norm " + no + " missing for: " + zd.getDescription());
+                    System.err.println("Norm " + no + " missing for: " + zdKey);
                     System.err.println(nv1 + " - " + nv2);
                 }
                 return null;
@@ -639,7 +641,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             ListOfDoubleArrays nv1Data = nv1.getData();
             ListOfDoubleArrays nv2Data = nv2.getData();
             timeDiffThings[1] = System.currentTimeMillis();
-            Block rawBlock = readBlock(blockNumber, zd);
+            Block rawBlock = readBlock(blockNumber, zdKey);
             timeDiffThings[2] = System.currentTimeMillis();
             if (rawBlock == null) return null;
 
@@ -656,17 +658,17 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             }
             timeDiffThings[3] = System.currentTimeMillis();
 
-            return new Block(blockNumber, normRecords, zd.getBlockKey(blockNumber, no));
+            return new Block(blockNumber, normRecords, BlockLoader.getBlockKey(zdKey, blockNumber, no));
         }
     }
 
-    private Block readBlock(int blockNumber, MatrixZoomData zd) throws IOException {
+    private Block readBlock(int blockNumber, String zdKey) throws IOException {
 
         long[] timeDiffThings = new long[6];
         timeDiffThings[0] = System.currentTimeMillis();
 
         Block b = null;
-        BlockIndex blockIndex = blockIndexMap.get(zd.getKey());
+        BlockIndex blockIndex = blockIndexMap.get(zdKey);
         if (blockIndex != null) {
 
             IndexEntry idx = blockIndex.getBlock(blockNumber);
@@ -774,7 +776,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                             throw new RuntimeException("Unknown block type: " + type);
                     }
                 }
-                b = new Block(blockNumber, records, zd.getBlockKey(blockNumber, NormalizationHandler.NONE));
+                b = new Block(blockNumber, records, BlockLoader.getBlockKey(zdKey, blockNumber, NormalizationHandler.NONE));
                 timeDiffThings[5] = System.currentTimeMillis();
                 for (int ii = 0; ii < timeDiffThings.length - 1; ii++) {
                     globalTimeDiffThings[ii] += (timeDiffThings[ii + 1] - timeDiffThings[ii]) / 1000.0;
@@ -784,7 +786,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
         // If no block exists, mark with an "empty block" to prevent further attempts
         if (b == null) {
-            b = new Block(blockNumber, zd.getBlockKey(blockNumber, NormalizationHandler.NONE));
+            b = new Block(blockNumber, BlockLoader.getBlockKey(zdKey, blockNumber, NormalizationHandler.NONE));
         }
         return b;
     }

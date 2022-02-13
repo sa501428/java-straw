@@ -35,6 +35,7 @@ import javastraw.reader.block.IdentityModifier;
 import javastraw.reader.depth.LogDepth;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.expected.ExpectedValueFunction;
+import javastraw.reader.iterators.ContactRecordIterator;
 import javastraw.reader.iterators.IteratorContainer;
 import javastraw.reader.iterators.ListOfListGenerator;
 import javastraw.reader.iterators.ZDIteratorContainer;
@@ -274,7 +275,11 @@ public class MatrixZoomData {
 
     protected Iterator<ContactRecord> getNewContactRecordIterator() {
         return getIteratorContainer().getNewContactRecordIterator();
-        //return new ContactRecordIterator(reader, this, blockCache);
+    }
+
+    public Iterator<ContactRecord> getDirectIterator() {
+        return new ContactRecordIterator(reader, getKey(), blockCache,
+                getChr1Idx(), getChr2Idx(), getZoom());
     }
 
     public IteratorContainer getIteratorContainer() {
@@ -288,14 +293,6 @@ public class MatrixZoomData {
     public IteratorContainer getFromFileIteratorContainer() {
         return new ZDIteratorContainer(reader, this, blockCache);
     }
-
-    /*
-    public BigListOfContactRecords getContactRecords(){
-        new ContactRecordIterator(reader, getKey(), blockCache,
-                getChr1Idx(), getChr2Idx(), getZoom());
-    }
-    */
-
 
     public BasicMatrix getPearsons(ExpectedValueFunction df) {
         if (chr1.getIndex() != chr2.getIndex()) {

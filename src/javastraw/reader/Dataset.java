@@ -72,8 +72,9 @@ public class Dataset {
         normalizationTypes = new ArrayList<>();
     }
 
-    public void clearCache() {
+    public void clearCache(boolean onlyClearInter) {
         for (Matrix matrix : matrices.values()) {
+            if (onlyClearInter && matrix.isIntra()) continue;
             try {
                 matrix.clearCache();
             } catch (Exception e) {

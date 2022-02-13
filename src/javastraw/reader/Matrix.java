@@ -176,6 +176,10 @@ public class Matrix {
         return chr1 != chr2;
     }
 
+    public boolean isIntra() {
+        return chr1 == chr2;
+    }
+
     public void clearCache() {
         for (MatrixZoomData mzd : bpZoomData) {
             try {

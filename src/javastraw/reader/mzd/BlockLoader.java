@@ -7,7 +7,6 @@ import javastraw.reader.block.BlockModifier;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 import javastraw.tools.ParallelizationTools;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
 import java.util.List;
@@ -21,15 +20,14 @@ public class BlockLoader {
                                                final NormalizationType no, BlockModifier modifier,
                                                final String zdKey,
                                                Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
-                                               boolean useCache, LRUCache<String, Block> blockCache,
-                                               DatasetReader reader) {
+                                               BlockCache blockCache, DatasetReader reader) {
         final AtomicInteger errorCounter = new AtomicInteger();
 
         ExecutorService service = Executors.newFixedThreadPool(200);
         for (final int blockNumber : blocksToLoad) {
             String key = getBlockKey(zdKey, blockNumber, no);
             readBlockUpdateListAndCache(blockNumber, reader, no, blockList, key, errorCounter, service, modifier,
-                    chrom1, chrom2, zoom, zdKey, useCache, blockCache);
+                    chrom1, chrom2, zoom, zdKey, blockCache);
         }
         ParallelizationTools.shutDownServiceAndWait(service, errorCounter);
     }
@@ -42,7 +40,7 @@ public class BlockLoader {
                                                     List<Block> blockList, String key, final AtomicInteger errorCounter,
                                                     ExecutorService service, BlockModifier modifier,
                                                     Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
-                                                    String zdKey, boolean useCache, LRUCache<String, Block> blockCache) {
+                                                    String zdKey, BlockCache blockCache) {
         Runnable loader = () -> {
             try {
                 Block b = reader.readNormalizedBlock(blockNumber, zdKey, no,
@@ -51,9 +49,7 @@ public class BlockLoader {
                     b = new Block(blockNumber, key);
                 }
                 b = modifier.modify(b, key, zoom.getBinSize(), chrom1, chrom2);
-                if (useCache) {
-                    blockCache.put(key, b);
-                }
+                blockCache.put(key, b);
                 blockList.add(b);
             } catch (IOException e) {
                 errorCounter.incrementAndGet();

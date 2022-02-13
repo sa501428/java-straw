@@ -7,7 +7,6 @@ import javastraw.reader.block.BlockModifier;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.util.*;
 
@@ -15,8 +14,7 @@ public class V9IntraBlockReader {
     public static List<Block> addNormalizedBlocksToListV9(final List<Block> blockList, int binX1, int binY1, int binX2, int binY2,
                                                           final NormalizationType norm, BlockModifier modifier,
                                                           int blockBinCount, V9Depth v9Depth,
-                                                          int blockColumnCount, boolean useCache,
-                                                          LRUCache<String, Block> blockCache, String zdKey,
+                                                          int blockColumnCount, BlockCache blockCache, String zdKey,
                                                           Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
                                                           DatasetReader reader) {
 
@@ -39,13 +37,12 @@ public class V9IntraBlockReader {
 
         for (int depth = nearerDepth; depth <= furtherDepth; depth++) {
             for (int pad = translatedLowerPAD; pad <= translatedHigherPAD; pad++) {
-                populateBlocksToLoadV9(pad, depth, norm, blockList, blocksToLoad, blockColumnCount,
-                        useCache, blockCache, zdKey);
+                populateBlocksToLoadV9(pad, depth, norm, blockList, blocksToLoad, blockColumnCount, blockCache, zdKey);
             }
         }
 
         BlockLoader.actuallyLoadGivenBlocks(blockList, blocksToLoad, norm, modifier, zdKey,
-                chrom1, chrom2, zoom, useCache, blockCache, reader);
+                chrom1, chrom2, zoom, blockCache, reader);
 
         return blockList;
     }
@@ -53,12 +50,11 @@ public class V9IntraBlockReader {
 
     protected static void populateBlocksToLoadV9(int positionAlongDiagonal, int depth, NormalizationType no,
                                                  List<Block> blockList, Set<Integer> blocksToLoad,
-                                                 int blockColumnCount, boolean useCache,
-                                                 LRUCache<String, Block> blockCache, String zdKey) {
+                                                 int blockColumnCount, BlockCache blockCache, String zdKey) {
         int blockNumber = getBlockNumberVersion9FromPADAndDepth(positionAlongDiagonal, depth, blockColumnCount);
         String key = BlockLoader.getBlockKey(zdKey, blockNumber, no);
         Block b;
-        if (useCache && blockCache.containsKey(key)) {
+        if (blockCache.containsKey(key)) {
             b = blockCache.get(key);
             blockList.add(b);
         } else {

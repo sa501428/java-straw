@@ -27,35 +27,34 @@ package javastraw.reader.iterators;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.block.Block;
 import javastraw.reader.block.ContactRecord;
+import javastraw.reader.mzd.BlockCache;
 import javastraw.reader.mzd.BlockLoader;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
 import java.util.Iterator;
 import java.util.List;
 
-public /**
+/**
  * Class for iterating over the contact records
  */
-class ContactRecordIterator implements Iterator<ContactRecord> {
+public class ContactRecordIterator implements Iterator<ContactRecord> {
 
     private final List<Integer> blockNumbers;
     private int blockIdx;
     private Iterator<ContactRecord> currentBlockIterator;
     private final DatasetReader reader;
     private final String zdKey;
-    private final LRUCache<String, Block> blockCache;
-    private final boolean useCache;
+    private final BlockCache blockCache;
     private final int chr1Idx, chr2Idx;
     private final HiCZoom zoom;
 
     /**
      * Initializes the iterator
      */
-    ContactRecordIterator(DatasetReader reader, String zdKey, LRUCache<String, Block> blockCache,
-                          boolean useCache, int chr1Idx, int chr2Idx, HiCZoom zoom) {
+    public ContactRecordIterator(DatasetReader reader, String zdKey, BlockCache blockCache,
+                                 int chr1Idx, int chr2Idx, HiCZoom zoom) {
         this.reader = reader;
         this.zdKey = zdKey;
         this.chr1Idx = chr1Idx;
@@ -64,7 +63,6 @@ class ContactRecordIterator implements Iterator<ContactRecord> {
         this.blockCache = blockCache;
         this.blockIdx = -1;
         this.blockNumbers = reader.getBlockNumbers(zdKey);
-        this.useCache = useCache;
     }
 
     /**
@@ -87,7 +85,7 @@ class ContactRecordIterator implements Iterator<ContactRecord> {
                     // Optionally check the cache
                     String key = BlockLoader.getBlockKey(zdKey, blockNumber, NormalizationHandler.NONE);
                     Block nextBlock;
-                    if (useCache && blockCache.containsKey(key)) {
+                    if (blockCache.containsKey(key)) {
                         nextBlock = blockCache.get(key);
                     } else {
                         nextBlock = reader.readNormalizedBlock(blockNumber, zdKey, NormalizationHandler.NONE,

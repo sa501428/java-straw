@@ -25,29 +25,25 @@
 package javastraw.reader.iterators;
 
 import javastraw.reader.DatasetReader;
-import javastraw.reader.block.Block;
 import javastraw.reader.block.ContactRecord;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.datastructures.ListOfFloatArrays;
+import javastraw.reader.mzd.BlockCache;
 import javastraw.reader.mzd.MatrixZoomData;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.util.Iterator;
 
 public class ZDIteratorContainer extends IteratorContainer {
 
-    private final LRUCache<String, Block> blockCache;
+    private final BlockCache blockCache;
     private final DatasetReader reader;
     private final MatrixZoomData zd;
-    private final boolean useCache;
 
-    public ZDIteratorContainer(DatasetReader reader, MatrixZoomData zd, LRUCache<String, Block> blockCache,
-                               boolean useCache) {
+    public ZDIteratorContainer(DatasetReader reader, MatrixZoomData zd, BlockCache blockCache) {
         super(zd.getMatrixSize());
         this.reader = reader;
         this.zd = zd;
         this.blockCache = blockCache;
-        this.useCache = useCache;
     }
 
     public static ListOfFloatArrays matrixVectorMultiplyOnIterator(Iterator<ContactRecord> iterator,
@@ -62,7 +58,7 @@ public class ZDIteratorContainer extends IteratorContainer {
 
     @Override
     public Iterator<ContactRecord> getNewContactRecordIterator() {
-        return new ContactRecordIterator(reader, zd.getKey(), blockCache, useCache,
+        return new ContactRecordIterator(reader, zd.getKey(), blockCache,
                 zd.getChr1Idx(), zd.getChr2Idx(), zd.getZoom());
     }
 
@@ -73,6 +69,6 @@ public class ZDIteratorContainer extends IteratorContainer {
 
     @Override
     public void clear() {
-        //blockCache.clear();
+        blockCache.clear();
     }
 }

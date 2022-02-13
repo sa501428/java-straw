@@ -28,12 +28,11 @@ package javastraw.reader.iterators;
 import javastraw.reader.Dataset;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.ChromosomeHandler;
-import javastraw.reader.block.Block;
 import javastraw.reader.block.ContactRecord;
+import javastraw.reader.mzd.BlockCache;
 import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.type.HiCZoom;
 import javastraw.tools.ParallelizationTools;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.util.Iterator;
 import java.util.List;
@@ -42,10 +41,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class ListOfListGenerator {
 
     public static IteratorContainer createFromZD(DatasetReader reader, MatrixZoomData matrixZoomData,
-                                                 LRUCache<String, Block> blockCache, boolean useCache,
-                                                 boolean useIteratorDontPutAllInRAM,
+                                                 BlockCache blockCache, boolean useIteratorDontPutAllInRAM,
                                                  boolean shouldCheckRAMUsage) {
-        IteratorContainer ic = new ZDIteratorContainer(reader, matrixZoomData, blockCache, useCache);
+        IteratorContainer ic = new ZDIteratorContainer(reader, matrixZoomData, blockCache);
         return tryToCreateIteratorInRAM(ic, useIteratorDontPutAllInRAM, shouldCheckRAMUsage);
     }
 

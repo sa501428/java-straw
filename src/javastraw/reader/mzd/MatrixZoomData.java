@@ -41,7 +41,6 @@ import javastraw.reader.iterators.ZDIteratorContainer;
 import javastraw.reader.pearsons.PearsonsManager;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.util.*;
 
@@ -56,7 +55,7 @@ public class MatrixZoomData {
     protected final int blockColumnCount;     // number of block columns
     protected final long correctedBinCount;
     // Cache the last 20 blocks loaded
-    protected final LRUCache<String, Block> blockCache;
+    protected final BlockCache blockCache;
     protected final V9Depth v9Depth;
     protected final Map<NormalizationType, BasicMatrix> pearsonsMap;
     protected DatasetReader reader;
@@ -66,7 +65,6 @@ public class MatrixZoomData {
     protected IteratorContainer iteratorContainer = null;
     public static boolean useIteratorDontPutAllInRAM = false;
     public static boolean shouldCheckRAMUsage = false;
-    protected boolean useCache = true;
 
     public MatrixZoomData(Chromosome chr1, Chromosome chr2, HiCZoom zoom, int blockBinCount, int blockColumnCount,
                           int[] chr1Sites, int[] chr2Sites, DatasetReader reader) {
@@ -76,7 +74,7 @@ public class MatrixZoomData {
         this.isIntra = chr1.getIndex() == chr2.getIndex();
         this.reader = reader;
         this.blockBinCount = blockBinCount;
-        blockCache = new LRUCache<>(500);
+        blockCache = new BlockCache();
         if (reader.getVersion() > 8) {
             v9Depth = V9Depth.setDepthMethod(reader.getDepthBase(), blockBinCount);
         } else {
@@ -117,13 +115,12 @@ public class MatrixZoomData {
         this.averageCount = zd0.averageCount;
         this.reader = zd0.reader;
         this.iteratorContainer = zd0.iteratorContainer;
-        this.useCache = zd0.useCache;
         this.pearsonsMap = zd0.pearsonsMap;
         this.eigenvectorMap = zd0.eigenvectorMap;
     }
 
     public void setUseCache(boolean useCache) {
-        this.useCache = useCache;
+        blockCache.setUseCache(useCache);
     }
 
     public Chromosome getChr1() {
@@ -200,10 +197,10 @@ public class MatrixZoomData {
         if (reader.getVersion() > 8 && isIntra) {
             return V9IntraBlockReader.addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1,
                     (int) binX2, (int) binY2, no, modifier, blockBinCount, v9Depth,
-                    blockColumnCount, useCache, blockCache, getKey(), chr1, chr2, zoom, reader);
+                    blockColumnCount, blockCache, getKey(), chr1, chr2, zoom, reader);
         } else {
             return LegacyVersionBlockReader.addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2,
-                    (int) binY2, no, fillUnderDiagonal, modifier, blockBinCount, blockColumnCount, useCache, blockCache,
+                    (int) binY2, no, fillUnderDiagonal, modifier, blockBinCount, blockColumnCount, blockCache,
                     getKey(), chr1, chr2, zoom, reader);
         }
     }
@@ -247,7 +244,6 @@ public class MatrixZoomData {
         }
     }
 
-
     /**
      * Returns the average count
      *
@@ -283,15 +279,22 @@ public class MatrixZoomData {
 
     public IteratorContainer getIteratorContainer() {
         if (iteratorContainer == null) {
-            iteratorContainer = ListOfListGenerator.createFromZD(reader, this, blockCache, useCache,
+            iteratorContainer = ListOfListGenerator.createFromZD(reader, this, blockCache,
                     useIteratorDontPutAllInRAM, shouldCheckRAMUsage);
         }
         return iteratorContainer;
     }
 
     public IteratorContainer getFromFileIteratorContainer() {
-        return new ZDIteratorContainer(reader, this, blockCache, useCache);
+        return new ZDIteratorContainer(reader, this, blockCache);
     }
+
+    /*
+    public BigListOfContactRecords getContactRecords(){
+        new ContactRecordIterator(reader, getKey(), blockCache,
+                getChr1Idx(), getChr2Idx(), getZoom());
+    }
+    */
 
 
     public BasicMatrix getPearsons(ExpectedValueFunction df) {

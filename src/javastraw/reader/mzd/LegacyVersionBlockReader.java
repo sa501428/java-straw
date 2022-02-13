@@ -6,7 +6,6 @@ import javastraw.reader.block.Block;
 import javastraw.reader.block.BlockModifier;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.util.*;
 
@@ -25,9 +24,8 @@ public class LegacyVersionBlockReader {
     public static List<Block> addNormalizedBlocksToList(final List<Block> blockList, int binX1, int binY1,
                                                         int binX2, int binY2, final NormalizationType norm,
                                                         boolean getBelowDiagonal, BlockModifier modifier,
-                                                        int blockBinCount, int blockColumnCount, boolean useCache,
-                                                        LRUCache<String, Block> blockCache, String zdKey,
-                                                        Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
+                                                        int blockBinCount, int blockColumnCount, BlockCache blockCache,
+                                                        String zdKey, Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
                                                         DatasetReader reader) {
 
         Set<Integer> blocksToLoad = new HashSet<>();
@@ -41,7 +39,7 @@ public class LegacyVersionBlockReader {
         for (int r = row1; r <= row2; r++) {
             for (int c = col1; c <= col2; c++) {
                 populateBlocksToLoad(r, c, norm, blockList, blocksToLoad, blockColumnCount,
-                        useCache, blockCache, zdKey);
+                        blockCache, zdKey);
             }
         }
 
@@ -49,25 +47,25 @@ public class LegacyVersionBlockReader {
             for (int r = row1; r <= row2; r++) {
                 for (int c = col1; c <= col2; c++) {
                     populateBlocksToLoad(c, r, norm, blockList, blocksToLoad, blockColumnCount,
-                            useCache, blockCache, zdKey);
+                            blockCache, zdKey);
                 }
             }
         }
 
         BlockLoader.actuallyLoadGivenBlocks(blockList, blocksToLoad, norm, modifier, zdKey,
-                chrom1, chrom2, zoom, useCache, blockCache, reader);
+                chrom1, chrom2, zoom, blockCache, reader);
 
         return new ArrayList<>(new HashSet<>(blockList));
     }
 
     protected static void populateBlocksToLoad(int r, int c, NormalizationType no, List<Block> blockList,
                                                Set<Integer> blocksToLoad, int blockColumnCount,
-                                               boolean useCache, LRUCache<String, Block> blockCache,
+                                               BlockCache blockCache,
                                                String zdKey) {
         int blockNumber = r * blockColumnCount + c;
         String key = BlockLoader.getBlockKey(zdKey, blockNumber, no);
         Block b;
-        if (useCache && blockCache.containsKey(key)) {
+        if (blockCache.containsKey(key)) {
             b = blockCache.get(key);
             blockList.add(b);
         } else {

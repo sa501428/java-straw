@@ -36,9 +36,6 @@ import javastraw.reader.depth.LogDepth;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.iterators.ContactRecordIterator;
-import javastraw.reader.iterators.IteratorContainer;
-import javastraw.reader.iterators.ListOfListGenerator;
-import javastraw.reader.iterators.ZDIteratorContainer;
 import javastraw.reader.pearsons.PearsonsManager;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
@@ -63,7 +60,6 @@ public class MatrixZoomData {
     protected final Map<String, double[]> eigenvectorMap;
     protected final BlockModifier identity = new IdentityModifier();
     protected double averageCount = -1;
-    protected IteratorContainer iteratorContainer = null;
     public static boolean useIteratorDontPutAllInRAM = false;
     public static boolean shouldCheckRAMUsage = false;
 
@@ -115,7 +111,6 @@ public class MatrixZoomData {
         this.v9Depth = zd0.v9Depth;
         this.averageCount = zd0.averageCount;
         this.reader = zd0.reader;
-        this.iteratorContainer = zd0.iteratorContainer;
         this.pearsonsMap = zd0.pearsonsMap;
         this.eigenvectorMap = zd0.eigenvectorMap;
     }
@@ -269,29 +264,9 @@ public class MatrixZoomData {
         eigenvectorMap.clear();
     }
 
-    public long getNumberOfContactRecords() {
-        return getIteratorContainer().getNumberOfContactRecords();
-    }
-
-    protected Iterator<ContactRecord> getNewContactRecordIterator() {
-        return getIteratorContainer().getNewContactRecordIterator();
-    }
-
     public Iterator<ContactRecord> getDirectIterator() {
         return new ContactRecordIterator(reader, getKey(), blockCache,
                 getChr1Idx(), getChr2Idx(), getZoom());
-    }
-
-    public IteratorContainer getIteratorContainer() {
-        if (iteratorContainer == null) {
-            iteratorContainer = ListOfListGenerator.createFromZD(reader, this, blockCache,
-                    useIteratorDontPutAllInRAM, shouldCheckRAMUsage);
-        }
-        return iteratorContainer;
-    }
-
-    public IteratorContainer getFromFileIteratorContainer() {
-        return new ZDIteratorContainer(reader, this, blockCache);
     }
 
     public BasicMatrix getPearsons(ExpectedValueFunction df) {
@@ -304,7 +279,7 @@ public class MatrixZoomData {
             return pearsons;
         }
 
-        pearsons = PearsonsManager.computePearsons(df, getNewContactRecordIterator(), chr1, zoom.getBinSize());
+        pearsons = PearsonsManager.computePearsons(df, getDirectIterator(), chr1, zoom.getBinSize());
         pearsonsMap.put(df.getNormalizationType(), pearsons);
         return pearsonsMap.get(df.getNormalizationType());
     }

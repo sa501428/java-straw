@@ -84,8 +84,7 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
                 if (c1.getIndex() < c2.getIndex() || (c1.equals(c2) && includeIntra)) {
                     MatrixZoomData zd = HiCFileTools.getMatrixZoomData(dataset, c1, c2, zoom);
                     if (zd != null) {
-                        IteratorContainer ic = zd.getFromFileIteratorContainer();
-                        Iterator<ContactRecord> iterator = ic.getNewContactRecordIterator();
+                        Iterator<ContactRecord> iterator = zd.getDirectIterator();
                         if (iterator != null && iterator.hasNext()) {
                             allIterators.add(new CoupledIteratorAndOffset(iterator, xOffset, yOffset));
                         }
@@ -107,7 +106,7 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
                 if (c1.getIndex() < c2.getIndex() || (c1.equals(c2) && includeIntra)) {
                     MatrixZoomData zd = HiCFileTools.getMatrixZoomData(dataset, c1, c2, zoom);
                     if (zd != null) {
-                        Iterator<ContactRecord> newIterator = zd.getFromFileIteratorContainer().getNewContactRecordIterator();
+                        Iterator<ContactRecord> newIterator = zd.getDirectIterator();
                         if (newIterator != null && newIterator.hasNext()) {
                             currentIterator = new CoupledIteratorAndOffset(newIterator, recentAddX, recentAddY);
                             return true;

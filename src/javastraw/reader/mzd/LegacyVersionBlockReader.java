@@ -8,10 +8,7 @@ import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 import org.broad.igv.util.collections.LRUCache;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class LegacyVersionBlockReader {
 
@@ -76,5 +73,38 @@ public class LegacyVersionBlockReader {
         } else {
             blocksToLoad.add(blockNumber);
         }
+    }
+
+    public static List<Integer> getBlockNumbersForRegionFromBinPosition(long[] regionIndices, int blockBinCount,
+                                                                        int blockColumnCount, boolean isIntra) {
+
+        // cast should be fine - this is for V8
+        int row1 = (int) (regionIndices[0] / blockBinCount);
+        int row2 = (int) ((regionIndices[1] + 1) / blockBinCount);
+        int col1 = (int) (regionIndices[2] / blockBinCount);
+        int col2 = (int) ((regionIndices[3] + 1) / blockBinCount);
+
+        // first check the upper triangular matrix
+        Set<Integer> blocksSet = new HashSet<>();
+        for (int r = row1; r <= row2; r++) {
+            for (int c = col1; c <= col2; c++) {
+                int blockNumber = r * blockColumnCount + c;
+                blocksSet.add(blockNumber);
+            }
+        }
+        // check region part that overlaps with lower left triangle
+        // but only if intrachromosomal
+        if (isIntra) {
+            for (int r = col1; r <= col2; r++) {
+                for (int c = row1; c <= row2; c++) {
+                    int blockNumber = r * blockColumnCount + c;
+                    blocksSet.add(blockNumber);
+                }
+            }
+        }
+
+        List<Integer> blocksToIterateOver = new ArrayList<>(blocksSet);
+        Collections.sort(blocksToIterateOver);
+        return blocksToIterateOver;
     }
 }

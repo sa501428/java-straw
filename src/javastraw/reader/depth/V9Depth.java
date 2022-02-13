@@ -23,5 +23,9 @@ public abstract class V9Depth {
         return logBase(Math.abs(val1 - val2) / Math.sqrt(2) / blockBinCount);
     }
 
+    public int getDepth(long val1, long val2) {
+        return logBase(Math.abs(val1 - val2) / Math.sqrt(2) / blockBinCount);
+    }
+
     protected abstract int logBase(double value);
 }

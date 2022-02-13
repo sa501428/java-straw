@@ -208,8 +208,6 @@ public class MatrixZoomData {
         }
     }
 
-
-
     /**
      * Utility for printing description of this matrix.
      */
@@ -223,10 +221,8 @@ public class MatrixZoomData {
         System.out.println("binSize (bp): " + zoom.getBinSize());
         System.out.println("blockBinCount (bins): " + blockBinCount);
         System.out.println("blockColumnCount (columns): " + blockColumnCount);
-
         System.out.println("Block size (bp): " + blockBinCount * zoom.getBinSize());
         System.out.println();
-
     }
 
     /**
@@ -241,37 +237,14 @@ public class MatrixZoomData {
         return getBlockNumbersForRegionFromBinPosition(regionBinIndices);
     }
 
-    // todo V9 needs a diff method
-    protected List<Integer> getBlockNumbersForRegionFromBinPosition(long[] regionIndices) {
-
-        // cast should be fine - this is for V8
-        int col1 = (int) (regionIndices[0] / blockBinCount);
-        int col2 = (int) ((regionIndices[1] + 1) / blockBinCount);
-        int row1 = (int) (regionIndices[2] / blockBinCount);
-        int row2 = (int) ((regionIndices[3] + 1) / blockBinCount);
-
-        // first check the upper triangular matrix
-        Set<Integer> blocksSet = new HashSet<>();
-        for (int r = row1; r <= row2; r++) {
-            for (int c = col1; c <= col2; c++) {
-                int blockNumber = r * getBlockColumnCount() + c;
-                blocksSet.add(blockNumber);
-            }
+    private List<Integer> getBlockNumbersForRegionFromBinPosition(long[] regionBinIndices) {
+        if (reader.getVersion() > 8 && isIntra) {
+            return V9IntraBlockReader.getBlockNumbersForRegionFromBinPosition(regionBinIndices,
+                    blockBinCount, blockColumnCount, isIntra, v9Depth);
+        } else {
+            return LegacyVersionBlockReader.getBlockNumbersForRegionFromBinPosition(regionBinIndices,
+                    blockBinCount, blockColumnCount, isIntra);
         }
-        // check region part that overlaps with lower left triangle
-        // but only if intrachromosomal
-        if (chr1.getIndex() == chr2.getIndex()) {
-            for (int r = col1; r <= col2; r++) {
-                for (int c = row1; c <= row2; c++) {
-                    int blockNumber = r * getBlockColumnCount() + c;
-                    blocksSet.add(blockNumber);
-                }
-            }
-        }
-
-        List<Integer> blocksToIterateOver = new ArrayList<>(blocksSet);
-        Collections.sort(blocksToIterateOver);
-        return blocksToIterateOver;
     }
 
 

@@ -32,11 +32,18 @@ public class CoupledIteratorAndOffset implements Iterator<ContactRecord> {
 
     private final Iterator<ContactRecord> internalIterator;
     private final int xOffset, yOffset;
+    private final boolean isIntra;
 
-    public CoupledIteratorAndOffset(Iterator<ContactRecord> iterator, int xOffset, int yOffset) {
+    public CoupledIteratorAndOffset(Iterator<ContactRecord> iterator, int xOffset, int yOffset,
+                                    boolean isIntra) {
         internalIterator = iterator;
         this.xOffset = xOffset;
         this.yOffset = yOffset;
+        this.isIntra = isIntra;
+    }
+
+    public boolean getIsIntra() {
+        return isIntra;
     }
 
     @Override

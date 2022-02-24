@@ -31,10 +31,4 @@ public class BlockCache {
             cache.clear();
         }
     }
-
-    public void addAll(BlockCache other) {
-        for (String key : other.cache.keySet()) {
-            cache.put(key, other.cache.get(key));
-        }
-    }
 }

@@ -40,7 +40,7 @@ import java.util.List;
 public class GenomeWideIterator implements Iterator<ContactRecord> {
 
     private final Chromosome[] chromosomes;
-    private final boolean includeIntra;
+    private final boolean includeIntra, includeInter;
     private final HiCZoom zoom;
     private final Dataset dataset;
     private Iterator<ContactRecord> currentIterator = null;
@@ -50,9 +50,10 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
     private int c1i = 0, c2i = 0;
 
     public GenomeWideIterator(Dataset dataset, ChromosomeHandler handler,
-                              HiCZoom zoom, boolean includeIntra) {
+                              HiCZoom zoom, boolean includeIntra, boolean includeInter) {
         this.chromosomes = handler.getChromosomeArrayWithoutAllByAll();
         this.includeIntra = includeIntra;
+        this.includeInter = includeInter;
         this.zoom = zoom;
         this.dataset = dataset;
         getNextIterator();
@@ -103,7 +104,8 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
             while (c2i < chromosomes.length) {
                 Chromosome c2 = chromosomes[c2i];
 
-                if (c1.getIndex() < c2.getIndex() || (c1.equals(c2) && includeIntra)) {
+                if ((c1.getIndex() < c2.getIndex() && includeInter)
+                        || (c1.equals(c2) && includeIntra)) {
                     MatrixZoomData zd = HiCFileTools.getMatrixZoomData(dataset, c1, c2, zoom);
                     if (zd != null) {
                         Iterator<ContactRecord> newIterator = zd.getDirectIterator();

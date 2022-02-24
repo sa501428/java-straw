@@ -38,6 +38,7 @@ import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.iterators.ContactRecordIterator;
 import javastraw.reader.pearsons.PearsonsManager;
 import javastraw.reader.type.HiCZoom;
+import javastraw.reader.type.NormalizationHandler;
 import javastraw.reader.type.NormalizationType;
 
 import java.util.*;
@@ -266,7 +267,12 @@ public class MatrixZoomData {
 
     public Iterator<ContactRecord> getDirectIterator() {
         return new ContactRecordIterator(reader, getKey(), blockCache,
-                getChr1Idx(), getChr2Idx(), getZoom());
+                getChr1Idx(), getChr2Idx(), getZoom(), NormalizationHandler.NONE);
+    }
+
+    public Iterator<ContactRecord> getNormalizedIterator(NormalizationType normType) {
+        return new ContactRecordIterator(reader, getKey(), blockCache,
+                getChr1Idx(), getChr2Idx(), getZoom(), normType);
     }
 
     public BasicMatrix getPearsons(ExpectedValueFunction df) {

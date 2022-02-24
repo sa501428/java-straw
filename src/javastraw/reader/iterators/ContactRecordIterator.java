@@ -30,7 +30,7 @@ import javastraw.reader.block.ContactRecord;
 import javastraw.reader.mzd.BlockCache;
 import javastraw.reader.mzd.BlockLoader;
 import javastraw.reader.type.HiCZoom;
-import javastraw.reader.type.NormalizationHandler;
+import javastraw.reader.type.NormalizationType;
 
 import java.io.IOException;
 import java.util.Iterator;
@@ -49,12 +49,13 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
     private final BlockCache blockCache;
     private final int chr1Idx, chr2Idx;
     private final HiCZoom zoom;
+    private final NormalizationType normType;
 
     /**
      * Initializes the iterator
      */
     public ContactRecordIterator(DatasetReader reader, String zdKey, BlockCache blockCache,
-                                 int chr1Idx, int chr2Idx, HiCZoom zoom) {
+                                 int chr1Idx, int chr2Idx, HiCZoom zoom, NormalizationType normType) {
         this.reader = reader;
         this.zdKey = zdKey;
         this.chr1Idx = chr1Idx;
@@ -62,6 +63,7 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
         this.zoom = zoom;
         this.blockCache = blockCache;
         this.blockIdx = -1;
+        this.normType = normType;
         this.blockNumbers = reader.getBlockNumbers(zdKey);
     }
 
@@ -83,16 +85,21 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
                     int blockNumber = blockNumbers.get(blockIdx);
 
                     // Optionally check the cache
-                    String key = BlockLoader.getBlockKey(zdKey, blockNumber, NormalizationHandler.NONE);
+                    String key = BlockLoader.getBlockKey(zdKey, blockNumber, normType);
                     Block nextBlock;
                     if (blockCache.containsKey(key)) {
                         nextBlock = blockCache.get(key);
                     } else {
-                        nextBlock = reader.readNormalizedBlock(blockNumber, zdKey, NormalizationHandler.NONE,
+                        nextBlock = reader.readNormalizedBlock(blockNumber, zdKey, normType,
                                 chr1Idx, chr2Idx, zoom);
                     }
-                    currentBlockIterator = nextBlock.getContactRecords().iterator();
-                    return true;
+                    List<ContactRecord> contactRecords = nextBlock.getContactRecords();
+                    if (contactRecords.size() > 0) {
+                        currentBlockIterator = contactRecords.iterator();
+                        return true;
+                    } else {
+                        return false;
+                    }
                 } catch (IOException e) {
                     System.err.println("Error fetching block " + e.getMessage());
                     return false;

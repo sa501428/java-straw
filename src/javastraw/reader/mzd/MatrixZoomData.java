@@ -181,15 +181,14 @@ public class MatrixZoomData {
     }
 
     public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2,
-                                                      final NormalizationType no, boolean isImportant,
+                                                      final NormalizationType no,
                                                       boolean fillUnderDiagonal) {
         return getNormalizedBlocksOverlapping(binX1, binY1, binX2, binY2,
-                no, isImportant, fillUnderDiagonal, identity);
+                no, fillUnderDiagonal, identity);
     }
 
     public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2,
-                                                      final NormalizationType no, boolean isImportant,
-                                                      boolean fillUnderDiagonal, BlockModifier modifier) {
+                                                      final NormalizationType no, boolean fillUnderDiagonal, BlockModifier modifier) {
         final List<Block> blockList = Collections.synchronizedList(new ArrayList<>());
         if (reader.getVersion() > 8 && isIntra) {
             return V9IntraBlockReader.addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1,

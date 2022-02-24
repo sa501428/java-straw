@@ -29,7 +29,7 @@ public class BlockLoader {
         List<Integer> blockIds = new ArrayList<>(blocksToLoad);
         AtomicInteger index = new AtomicInteger(0);
 
-        ParallelizationTools.launchParallelizedCode(1, () -> { //numJobs
+        ParallelizationTools.launchParallelizedCode(2, () -> { //numJobs
             List<Block> blockList = new ArrayList<>();
             BlockCache blockCache = new BlockCache();
 

@@ -50,14 +50,14 @@ public class DynamicMatrixZoomData extends MatrixZoomData {
 
     @Override
     public List<Block> getNormalizedBlocksOverlapping(long binX1, long binY1, long binX2, long binY2,
-                                                      final NormalizationType norm, boolean isImportant, boolean fillUnderDiagonal) {
+                                                      final NormalizationType norm, boolean fillUnderDiagonal) {
         // for V8 will be ints
         int higherBinX1 = (int) (binX1 * scaleFactor);
         int higherBinY1 = (int) (binY1 * scaleFactor);
         int higherBinX2 = (int) (binX2 * scaleFactor);
         int higherBinY2 = (int) (binY2 * scaleFactor);
         List<Block> blocksFromHigherRes = higherResZD.getNormalizedBlocksOverlapping(higherBinX1, higherBinY1, higherBinX2, higherBinY2,
-                norm, isImportant, fillUnderDiagonal);
+                norm, fillUnderDiagonal);
         return createBlocksForLowerRes(blocksFromHigherRes, norm);
     }
 

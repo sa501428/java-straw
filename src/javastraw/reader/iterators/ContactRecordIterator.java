@@ -80,7 +80,7 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
             return true;
         } else {
             blockIdx++;
-            if (blockIdx < blockNumbers.size()) {
+            while (blockIdx < blockNumbers.size()) {
                 try {
                     int blockNumber = blockNumbers.get(blockIdx);
 
@@ -94,16 +94,15 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
                                 chr1Idx, chr2Idx, zoom);
                     }
                     List<ContactRecord> contactRecords = nextBlock.getContactRecords();
-                    if (contactRecords.size() > 0) {
+                    if (contactRecords != null && contactRecords.size() > 0) {
                         currentBlockIterator = contactRecords.iterator();
                         return true;
-                    } else {
-                        return false;
                     }
                 } catch (IOException e) {
                     System.err.println("Error fetching block " + e.getMessage());
                     return false;
                 }
+                blockIdx++;
             }
         }
 

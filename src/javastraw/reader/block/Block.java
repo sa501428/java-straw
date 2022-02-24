@@ -24,13 +24,11 @@
 
 package javastraw.reader.block;
 
-//import java.awt.*;
-//import java.util.List;
-
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
-public class Block {
+public class Block implements Comparable<Block> {
 
     private final int number;
     private final String uniqueRegionID;
@@ -58,5 +56,33 @@ public class Block {
 
     public List<ContactRecord> getContactRecords() {
         return records;
+    }
+
+    @Override
+    public int compareTo(Block o) {
+        if (this == o) return 0;
+        int[] comparisons = new int[]{Integer.compare(number, o.number),
+                uniqueRegionID.compareTo(o.uniqueRegionID),
+                Integer.compare(records.size(), o.records.size())
+        };
+        for (int val : comparisons) {
+            if (val != 0) {
+                return val;
+            }
+        }
+        return 0;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof Block
+                && ((Block) obj).number == number
+                && ((Block) obj).uniqueRegionID.equals(uniqueRegionID)
+                && ((Block) obj).records.size() == records.size();
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(number, uniqueRegionID, records.size());
     }
 }

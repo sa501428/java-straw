@@ -3,6 +3,9 @@ package javastraw.reader.mzd;
 import javastraw.reader.block.Block;
 import org.broad.igv.util.collections.LRUCache;
 
+import java.util.HashSet;
+import java.util.Set;
+
 public class BlockCache {
     LRUCache<String, Block> cache = new LRUCache<>(500);
     private boolean useCache = true;
@@ -29,6 +32,13 @@ public class BlockCache {
         this.useCache = useCache;
         if (!useCache) {
             cache.clear();
+        }
+    }
+
+    public void addAll(BlockCache other) {
+        Set<String> keys = new HashSet<>(other.cache.keySet());
+        for (String key : keys) {
+            cache.put(key, other.cache.get(key));
         }
     }
 }

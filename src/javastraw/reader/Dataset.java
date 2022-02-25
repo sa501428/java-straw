@@ -74,6 +74,7 @@ public class Dataset {
 
     public void clearCache(boolean onlyClearInter) {
         for (Matrix matrix : matrices.values()) {
+            if (matrix == null) continue;
             if (onlyClearInter && matrix.isIntra()) continue;
             try {
                 matrix.clearCache();

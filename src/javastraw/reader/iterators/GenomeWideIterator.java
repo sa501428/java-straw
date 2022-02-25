@@ -40,7 +40,7 @@ import java.util.List;
 public class GenomeWideIterator implements Iterator<ContactRecord> {
 
     private final Chromosome[] chromosomes;
-    private final boolean includeIntra;
+    private final boolean includeIntra, includeInter;
     private final HiCZoom zoom;
     private final Dataset dataset;
     private Iterator<ContactRecord> currentIterator = null;
@@ -50,9 +50,10 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
     private int c1i = 0, c2i = 0;
 
     public GenomeWideIterator(Dataset dataset, ChromosomeHandler handler,
-                              HiCZoom zoom, boolean includeIntra) {
+                              HiCZoom zoom, boolean includeIntra, boolean includeInter) {
         this.chromosomes = handler.getChromosomeArrayWithoutAllByAll();
         this.includeIntra = includeIntra;
+        this.includeInter = includeInter;
         this.zoom = zoom;
         this.dataset = dataset;
         getNextIterator();
@@ -69,10 +70,10 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
         return getNextIterator();
     }
 
-    public static List<Iterator<ContactRecord>> getAllFromFileIterators(Dataset dataset, ChromosomeHandler handler,
-                                                                        HiCZoom zoom, boolean includeIntra) {
+    public static List<CoupledIteratorAndOffset> getAllFromFileIterators(Dataset dataset, ChromosomeHandler handler,
+                                                                         HiCZoom zoom, boolean includeIntra) {
         Chromosome[] chromosomes = handler.getChromosomeArrayWithoutAllByAll();
-        List<Iterator<ContactRecord>> allIterators = new ArrayList<>();
+        List<CoupledIteratorAndOffset> allIterators = new ArrayList<>();
 
         int xOffset = 0;
         for (int i = 0; i < chromosomes.length; i++) {
@@ -80,14 +81,13 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
             int yOffset = 0 + xOffset;
             for (int j = i; j < chromosomes.length; j++) {
                 Chromosome c2 = chromosomes[j];
-
                 if (c1.getIndex() < c2.getIndex() || (c1.equals(c2) && includeIntra)) {
                     MatrixZoomData zd = HiCFileTools.getMatrixZoomData(dataset, c1, c2, zoom);
                     if (zd != null) {
-                        IteratorContainer ic = zd.getFromFileIteratorContainer();
-                        Iterator<ContactRecord> iterator = ic.getNewContactRecordIterator();
+                        Iterator<ContactRecord> iterator = zd.getDirectIterator();
                         if (iterator != null && iterator.hasNext()) {
-                            allIterators.add(new CoupledIteratorAndOffset(iterator, xOffset, yOffset));
+                            allIterators.add(new CoupledIteratorAndOffset(iterator, xOffset, yOffset,
+                                    c1.getIndex() == c2.getIndex()));
                         }
                     }
                 }
@@ -104,12 +104,14 @@ public class GenomeWideIterator implements Iterator<ContactRecord> {
             while (c2i < chromosomes.length) {
                 Chromosome c2 = chromosomes[c2i];
 
-                if (c1.getIndex() < c2.getIndex() || (c1.equals(c2) && includeIntra)) {
+                if ((c1.getIndex() < c2.getIndex() && includeInter)
+                        || (c1.equals(c2) && includeIntra)) {
                     MatrixZoomData zd = HiCFileTools.getMatrixZoomData(dataset, c1, c2, zoom);
                     if (zd != null) {
-                        Iterator<ContactRecord> newIterator = zd.getFromFileIteratorContainer().getNewContactRecordIterator();
+                        Iterator<ContactRecord> newIterator = zd.getDirectIterator();
                         if (newIterator != null && newIterator.hasNext()) {
-                            currentIterator = new CoupledIteratorAndOffset(newIterator, recentAddX, recentAddY);
+                            currentIterator = new CoupledIteratorAndOffset(newIterator, recentAddX, recentAddY,
+                                    c1.getIndex() == c2.getIndex());
                             return true;
                         }
                     }

@@ -52,7 +52,7 @@ public class LegacyVersionBlockReader {
             }
         }
 
-        BlockLoader.actuallyLoadGivenBlocks(blockList, blocksToLoad, norm, modifier, zdKey,
+        BlockLoader.actuallyLoadGivenBlocks(blockList, new ArrayList<>(blocksToLoad), norm, modifier, zdKey,
                 chrom1, chrom2, zoom, blockCache, reader);
 
         return new ArrayList<>(new HashSet<>(blockList));

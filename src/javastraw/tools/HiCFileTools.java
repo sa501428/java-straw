@@ -338,7 +338,7 @@ public class HiCFileTools {
 
         try {
             blocks.addAll(zd.getNormalizedBlocksOverlapping(binXStart, binYStart, binXEnd, binYEnd, normalizationType,
-                    false, fillUnderDiagonal));
+                    fillUnderDiagonal));
         } catch (Exception e) {
             triggerNormError(normalizationType);
             if (StrawGlobals.printVerboseComments) {

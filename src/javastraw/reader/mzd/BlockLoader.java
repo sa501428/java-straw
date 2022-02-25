@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class BlockLoader {
-    public static void actuallyLoadGivenBlocks(final List<Block> globalBlockList, Set<Integer> blocksToLoad,
+    public static void actuallyLoadGivenBlocks(final List<Block> globalBlockList, List<Integer> blockIds,
                                                final NormalizationType no, BlockModifier modifier,
                                                final String zdKey, Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
                                                BlockCache globalBlockCache, DatasetReader reader) {
@@ -25,11 +25,10 @@ public class BlockLoader {
         final Object cacheLock = new Object();
         final Set<Block> globalBlockSet = new HashSet<>();
 
-        int numJobs = Math.min(blocksToLoad.size(), 100);
-        List<Integer> blockIds = new ArrayList<>(blocksToLoad);
+        int numJobs = Math.min(blockIds.size(), 100);
         AtomicInteger index = new AtomicInteger(0);
 
-        ParallelizationTools.launchParallelizedCode(2, () -> { //numJobs
+        ParallelizationTools.launchParallelizedCode(10, () -> { //numJobs
             List<Block> blockList = new ArrayList<>();
             BlockCache blockCache = new BlockCache();
 

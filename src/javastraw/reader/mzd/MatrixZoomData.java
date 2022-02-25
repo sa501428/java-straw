@@ -233,7 +233,7 @@ public class MatrixZoomData {
     private List<Integer> getBlockNumbersForRegionFromBinPosition(long[] regionBinIndices) {
         if (reader.getVersion() > 8 && isIntra) {
             return V9IntraBlockReader.getBlockNumbersForRegionFromBinPosition(regionBinIndices,
-                    blockBinCount, blockColumnCount, isIntra, v9Depth);
+                    blockBinCount, blockColumnCount, v9Depth);
         } else {
             return LegacyVersionBlockReader.getBlockNumbersForRegionFromBinPosition(regionBinIndices,
                     blockBinCount, blockColumnCount, isIntra);

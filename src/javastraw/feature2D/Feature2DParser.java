@@ -221,11 +221,19 @@ public class Feature2DParser {
             }
 
             // Convention is chr1 is lowest "index". Swap if necessary
-            if (chr1.getIndex() <= chr2.getIndex()) {
+            if (chr1.getIndex() < chr2.getIndex()) { // inter above diagonal
                 newList.add(chr1.getIndex(), chr2.getIndex(), new Feature2D(featureType, chr1Name, start1, end1, chr2Name, start2, end2, c, attrs));
-            } else {
+            } else if (chr2.getIndex() < chr1.getIndex()) { // inter below diagonal
+                newList.add(chr2.getIndex(), chr1.getIndex(), new Feature2D(featureType, chr2Name, start2, end2, chr1Name, start1, end1, c, attrs));
+            } else if (midPoint(start1, end1) <= midPoint(start2, end2)) { // intra above diagonal
+                newList.add(chr1.getIndex(), chr2.getIndex(), new Feature2D(featureType, chr1Name, start1, end1, chr2Name, start2, end2, c, attrs));
+            } else { // intra below diagonal
                 newList.add(chr2.getIndex(), chr1.getIndex(), new Feature2D(featureType, chr2Name, start2, end2, chr1Name, start1, end1, c, attrs));
             }
+        }
+
+        private static int midPoint(int start1, int end1) {
+            return (start1 + end1) / 2;
         }
 
         private static void addToList(String chrAName, Feature2D feature, ChromosomeHandler handler, String nextLine,

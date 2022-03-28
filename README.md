@@ -4,6 +4,9 @@ About Java Straw
 Java Straw is a library for quickly reading data from the HiC file format, to be used directly in code without dumping
 data to a local file.
 
+Here's a detailed example of how to use Java-Straw:
+[AnnotatedExample.java](https://github.com/sa501428/java-straw/blob/master/src/javastraw/AnnotatedExample.java)
+
 Ongoing development work is carried out by <a href="https://github.com/sa501428">Muhammad Saad Shamim</a>. Past
 contributors include <a href="https://github.com/nchernia">Neva C. Durand</a>, <a href="https://github.com/suhas-rao">
 Suhas Rao</a>, and <a href="https://github.com/jrobinso">Jim Robinson</a>.

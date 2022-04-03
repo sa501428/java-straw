@@ -63,7 +63,7 @@ public class ParallelizationTools {
         try {
             service.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
-            System.err.println("Error loading mzd data " + e.getLocalizedMessage());
+            System.err.println("Error " + e.getLocalizedMessage());
             if (StrawGlobals.printVerboseComments) {
                 e.printStackTrace();
             }
@@ -71,7 +71,18 @@ public class ParallelizationTools {
 
         // error printing
         if (errorCounter.get() > 0) {
-            System.err.println(errorCounter.get() + " errors while reading blocks");
+            System.err.println(errorCounter.get() + " errors during process");
+        }
+    }
+
+    public static void shutDownAndWaitUntilDone(ExecutorService executor, int milliseconds) {
+        executor.shutdown();
+        while (!executor.isTerminated()) {
+            try {
+                Thread.sleep(milliseconds);
+            } catch (InterruptedException e) {
+                System.err.println(e.getLocalizedMessage());
+            }
         }
     }
 }

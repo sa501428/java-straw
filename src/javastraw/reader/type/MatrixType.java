@@ -29,6 +29,8 @@ public enum MatrixType {
     OBSERVED("Observed"),
     EXPECTED("Expected"),
     OE("Observed/Expected"),
+    PROB("Observed Probability"),
+    PROB2("Observed Probability Inf"),
     OEV2("Log(Observed/Expected)"),
     OEP1("(Observed+1)/(Expected+1)"),
     OEP1V2("Log((Observed+1)/(Expected+1))"),
@@ -42,6 +44,8 @@ public enum MatrixType {
     NORM2("Observed Norm^2"),
     CONTROL("Control"),
     OECTRL("Control/ExpectedC"),
+    PROBCTRL("Control Probability"),
+    PROB2CTRL("Control Probability Inf"),
     OECTRLV2("Log(Control/ExpectedC)"),
     OECTRLP1("(Control+1)/(ExpectedC+1)"),
     OECTRLP1V2("Log((Control+1)/(ExpectedC+1))"),
@@ -61,6 +65,8 @@ public enum MatrixType {
     RATIO0P1V2("Log((Observed+1)/(Control+1) * (ExpC0+1)/(Exp0+1))"),
     VS("Observed vs Control"),
     OEVS("Observed/Expected vs Control/ExpectedC"),
+    PROBVS("Probability Observed vs Control"),
+    PROB2VS("Probability Inf Observed vs Control"),
     OEVSV2("Log(Observed/Expected) vs Log(Control/ExpectedC)"),
     OEVSP1("(Observed+1)/(Expected+1) vs (Control+1)/(ExpectedC+1)"),
     OEVSP1V2("Log((Observed+1)/(Expected+1)) vs Log((Control+1)/(ExpectedC+1))"),
@@ -88,6 +94,8 @@ public enum MatrixType {
             EXPECTED,
             OE, OECTRL, OEVS,
             OEV2, OECTRLV2, OEVSV2,
+            PROB, PROBCTRL, PROBVS,
+            PROB2, PROB2CTRL, PROB2VS,
             RATIO, RATIOV2,
             PEARSON, PEARSONCTRL, PEARSONVS,
             LOG, LOGC, LOGVS,
@@ -97,7 +105,7 @@ public enum MatrixType {
     };
 
     public static final MatrixType[] enabledMatrixTypesNoControl =
-            new MatrixType[]{OBSERVED, EXPECTED, OE, OEV2, PEARSON, LOG, EXPLOGEO};
+            new MatrixType[]{OBSERVED, EXPECTED, OE, OEV2, PROB, PROB2, PEARSON, LOG, EXPLOGEO};
 
     private final String value;
 
@@ -140,7 +148,8 @@ public enum MatrixType {
      * @return true if the option should allowed in genome-wide view
      */
     public static boolean isValidGenomeWideOption(MatrixType option) {
-        return !option.toString().toLowerCase().contains("expected");
+        return !(option.toString().toLowerCase().contains("expected") ||
+                option.toString().toLowerCase().contains("probability"));
     }
 
     /**
@@ -148,7 +157,8 @@ public enum MatrixType {
      * @return true if the option requires control map but not expected vector
      */
     public static boolean isSimpleControlType(MatrixType option) {
-        return option.toString().toLowerCase().contains("control") && !option.toString().toLowerCase().contains("expected");
+        return option.toString().toLowerCase().contains("control") &&
+                !option.toString().toLowerCase().contains("expected");
     }
 
 
@@ -173,7 +183,8 @@ public enum MatrixType {
      * @return true if the option only works for intrachromosomal, not interchromosomal (genomewide may still be allowed)
      */
     public static boolean isOnlyIntrachromosomalType(MatrixType option) {
-        return isPearsonType(option) || isVSTypeDisplay(option);
+        return isPearsonType(option) || isVSTypeDisplay(option) ||
+                option.toString().toLowerCase().contains("probability");
     }
 
     /**
@@ -181,7 +192,8 @@ public enum MatrixType {
      * @return true if the option requires the expected vector
      */
     public static boolean isExpectedValueType(MatrixType option) {
-        return option.toString().toLowerCase().contains("expected");
+        return option.toString().toLowerCase().contains("expected") ||
+                option.toString().toLowerCase().contains("probability");
     }
 
     /**

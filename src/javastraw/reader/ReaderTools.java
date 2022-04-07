@@ -32,11 +32,17 @@ public class ReaderTools {
     private static final int maxLengthEntryName = 100;
     private static final int MAX_BYTE_READ_SIZE = Integer.MAX_VALUE - 10;
 
-    static SeekableStream getValidStream(String path) throws IOException {
+    public static SeekableStream getValidStream(String path) throws IOException {
         SeekableStream stream;
         do {
             stream = streamFactory.getStreamFor(path);
         } while (stream == null);
+        return stream;
+    }
+
+    public static SeekableStream getValidStream(String path, long position) throws IOException {
+        SeekableStream stream = getValidStream(path);
+        stream.seek(position);
         return stream;
     }
 
@@ -52,8 +58,7 @@ public class ReaderTools {
 
     static byte[] seekAndFullyReadCompressedBytes(IndexEntry idx, String path) throws IOException {
         byte[] compressedBytes = new byte[idx.size];
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(idx.position);
+        SeekableStream stream = ReaderTools.getValidStream(path, idx.position);
         stream.readFully(compressedBytes);
         stream.close();
         return compressedBytes;
@@ -68,8 +73,7 @@ public class ReaderTools {
         }
         compressedBytes.add(new byte[(int) counter]);
 
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(idx.position);
+        SeekableStream stream = ReaderTools.getValidStream(path, idx.position);
         for (int i = 0; i < compressedBytes.size(); i++) {
             stream.readFully(compressedBytes.get(i));
         }
@@ -81,8 +85,7 @@ public class ReaderTools {
                                                          long filePointer, String path, boolean useCache,
                                                          Map<String, BlockIndex> blockIndexMap,
                                                          DatasetReader reader) throws IOException {
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(filePointer);
+        SeekableStream stream = ReaderTools.getValidStream(path, filePointer);
         LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
         String hicUnitStr = dis.readString();
@@ -135,9 +138,8 @@ public class ReaderTools {
     static long readExpectedVectorInFooter(long currentPosition,
                                            Map<String, ExpectedValueFunction> expectedValuesMap,
                                            NormalizationType norm, int version, String path, DatasetReader reader) throws IOException {
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(currentPosition);
-        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+        SeekableStream stream = ReaderTools.getValidStream(path, currentPosition);
+        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, 50));
         String unitString = dis.readString();
         currentPosition += (unitString.length() + 1);
         HiCZoom.HiCUnit unit = HiCZoom.valueOfUnit(unitString);
@@ -146,7 +148,7 @@ public class ReaderTools {
 
         long[] nValues = new long[1];
         currentPosition += readVectorLength(dis, nValues, version);
-
+        /* todo time
         if (binSize >= 500) {
             currentPosition = ReaderTools.readWholeNormalizationVector(currentPosition, dis, expectedValuesMap, unit, binSize,
                     nValues[0], norm, version);
@@ -154,6 +156,9 @@ public class ReaderTools {
             currentPosition = ReaderTools.setUpPartialVectorStreaming(currentPosition, expectedValuesMap, unit, binSize,
                     nValues[0], norm, version, path, reader);
         }
+         */
+        currentPosition = ReaderTools.setUpPartialVectorStreaming(currentPosition, expectedValuesMap, unit, binSize,
+                nValues[0], norm, version, path, reader);
         stream.close();
         return currentPosition;
     }
@@ -179,14 +184,11 @@ public class ReaderTools {
             skipPosition += (nValues * 8);
         }
 
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(skipPosition);
-        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
-        //long skipPosition = stream.position();
-        int nNormalizationFactors = dis.readInt();
+        SeekableStream stream = ReaderTools.getValidStream(path, skipPosition);
+        int nNormalizationFactors = ReaderTools.readIntFromBytes(stream);
         currentPosition = skipPosition + 4;
 
-        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, dis);
+        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, currentPosition, path);
         currentPosition += hmReader.getOffset();
 
         ExpectedValueFunction df = new ExpectedValueFunctionImpl(norm, unit, binSize, nValues,
@@ -211,7 +213,7 @@ public class ReaderTools {
         int nNormalizationFactors = dis.readInt();
         currentPosition += 4;
 
-        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, dis);
+        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, currentPosition, null);
         currentPosition += hmReader.getOffset();
 
         String key = ExpectedValueFunction.getKey(unit, binSize, norm);
@@ -289,5 +291,18 @@ public class ReaderTools {
             sites[s] = les.readInt();
         }
         return sites;
+    }
+
+    public static int readIntFromBytes(SeekableStream stream) throws IOException {
+        byte[] buffer = new byte[4];
+        int actualBytes = stream.read(buffer);
+        if (actualBytes == 4) {
+            LittleEndianInputStream dis = new LittleEndianInputStream(new ByteArrayInputStream(buffer));
+            return dis.readInt();
+        } else {
+            System.err.println("Actually read " + actualBytes + " bytes instead of " + 4);
+            System.exit(110);
+            return 0;
+        }
     }
 }

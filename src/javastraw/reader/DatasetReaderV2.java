@@ -345,8 +345,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         // Normalized expected values (v6 and greater only)
         if (version >= 6) {
             currentPosition = normVectorFilePosition;
-            SeekableStream stream = ReaderTools.getValidStream(path);
-            stream.seek(currentPosition);
+            SeekableStream stream = ReaderTools.getValidStream(path, currentPosition);
             LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
 
@@ -363,7 +362,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
             for (int i = 0; i < nNormExpectedValueVectors; i++) {
                 stream.seek(currentPosition);
-                dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
+                dis = new LittleEndianInputStream(new BufferedInputStream(stream, 30));
 
                 String typeString = dis.readString();
                 NormalizationType norm = dataset.getNormalizationHandler().getNormTypeFromString(typeString);
@@ -403,10 +402,8 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
     private long readExpectedValuesMapForNone(long currentPosition) throws IOException {
         Map<String, ExpectedValueFunction> expectedValuesMap = new LinkedHashMap<>();
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(currentPosition);
-        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
-        int nExpectedValues = dis.readInt();
+        SeekableStream stream = ReaderTools.getValidStream(path, currentPosition);
+        int nExpectedValues = ReaderTools.readIntFromBytes(stream);
         currentPosition += 4;
         for (int i = 0; i < nExpectedValues; i++) {
             NormalizationType norm = NormalizationHandler.NONE;
@@ -419,12 +416,10 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     private long populateMasterIndex(long currentPosition) throws IOException {
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(currentPosition);
-        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
-
-        int nEntries = dis.readInt();
+        SeekableStream stream = ReaderTools.getValidStream(path, currentPosition);
+        int nEntries = ReaderTools.readIntFromBytes(stream);
         currentPosition += 4;
+        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, 50 * nEntries));
 
         for (int i = 0; i < nEntries; i++) {
             String key = dis.readString();
@@ -439,8 +434,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     private long determineNormVectorFilePosition(int numBytesInVar, long position) throws IOException {
-        SeekableStream stream = ReaderTools.getValidStream(path);
-        stream.seek(position);
+        SeekableStream stream = ReaderTools.getValidStream(path, position);
         byte[] buffer = new byte[numBytesInVar];
         int actualBytes = stream.read(buffer);
         if (numBytesInVar == actualBytes) {

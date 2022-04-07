@@ -45,7 +45,7 @@ public class DynamicBlockIndex extends BlockIndex {
         this.stream = stream;
         this.maxBlocks = maxBlocks;
         this.minPosition = minPosition;
-        maxPosition = minPosition + numBlocks * 16;
+        maxPosition = minPosition + numBlocks * 16L;
     }
 
 

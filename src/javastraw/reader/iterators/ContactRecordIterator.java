@@ -75,6 +75,9 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
      */
     @Override
     public boolean hasNext() {
+        if (blockNumbers == null || blockNumbers.size() == 0) {
+            return false;
+        }
 
         if (currentBlockIterator != null && currentBlockIterator.hasNext()) {
             return true;

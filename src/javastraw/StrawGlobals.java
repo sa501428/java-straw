@@ -25,12 +25,12 @@
 package javastraw;
 
 public class StrawGlobals {
-    public static final String versionNum = "2.12.02";
-    // min hic file version supported
+    public static final String versionNum = "2.13.01";
     public static final int minVersion = 6;
     public static final int bufferSize = 2097152;
 
-    // implement Map scaling with this global variable
     public static boolean allowDynamicBlockIndex = true;
+    public static int dynamicResolutionLimit = 50;
+
     public static boolean printVerboseComments = false;
 }

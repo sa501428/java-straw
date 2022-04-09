@@ -43,7 +43,7 @@ public interface DatasetReader {
 
     Dataset read() throws IOException;
 
-    Matrix readMatrix(String key) throws IOException;
+    Matrix readMatrix(String key, int resolution) throws IOException;
 
     Block readNormalizedBlock(int blockNumber, String zdKey, NormalizationType no,
                               int chr1Index, int chr2Index, HiCZoom zoom) throws IOException;

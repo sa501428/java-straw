@@ -87,6 +87,10 @@ public class Dataset {
     }
 
     public Matrix getMatrix(Chromosome chr1, Chromosome chr2) {
+        return getMatrix(chr1, chr2, -1);
+    }
+
+    public Matrix getMatrix(Chromosome chr1, Chromosome chr2, int specificResolution) {
 
         // order is arbitrary, convention is lower # chr first
         if (chr1 == null || chr2 == null) return null;
@@ -97,7 +101,7 @@ public class Dataset {
 
         if (m == null && reader != null) {
             try {
-                m = reader.readMatrix(key);
+                m = reader.readMatrix(key, specificResolution);
                 matrices.put(key, m);
             } catch (Exception e) {
                 System.err.println("Error fetching matrix for: " + chr1.getName() + "-" + chr2.getName());

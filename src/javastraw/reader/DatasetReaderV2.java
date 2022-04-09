@@ -455,7 +455,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     }
 
     @Override
-    public Matrix readMatrix(String key) throws IOException {
+    public Matrix readMatrix(String key, int specificResolution) throws IOException {
         IndexEntry idx = masterIndex.get(key);
         if (idx == null) {
             return null;
@@ -493,7 +493,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         for (int i = 0; i < nResolutions; i++) {
             try {
                 Pair<MatrixZoomData, Long> result = ReaderTools.readMatrixZoomData(chr1, chr2, chr1Sites, chr2Sites,
-                        currentFilePosition, path, useCache, blockIndexMap, this);
+                        currentFilePosition, path, useCache, blockIndexMap, this, specificResolution);
                 zdList.add(result.getFirst());
                 currentFilePosition = result.getSecond();
             } catch (Exception ee) {

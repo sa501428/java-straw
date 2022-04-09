@@ -25,7 +25,6 @@
 
 package javastraw.reader.mzd;
 
-import javastraw.StrawGlobals;
 import javastraw.matrices.BasicMatrix;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
@@ -266,21 +265,11 @@ public class MatrixZoomData {
     }
 
     public Iterator<ContactRecord> getDirectIterator() {
-        if (zoom.getBinSize() < StrawGlobals.dynamicResolutionLimit && StrawGlobals.allowDynamicBlockIndex) {
-            System.err.println("This resolution has currently been loaded with dynamic blocks; reload it using direct Matrix loading");
-            System.exit(9);
-            return null;
-        }
         return new ContactRecordIterator(reader, getKey(), blockCache,
                 getChr1Idx(), getChr2Idx(), getZoom(), NormalizationHandler.NONE);
     }
 
     public Iterator<ContactRecord> getNormalizedIterator(NormalizationType normType) {
-        if (zoom.getBinSize() < StrawGlobals.dynamicResolutionLimit && StrawGlobals.allowDynamicBlockIndex) {
-            System.err.println("This resolution has currently been loaded with dynamic blocks; reload it using direct Matrix loading");
-            System.exit(19);
-            return null;
-        }
         return new ContactRecordIterator(reader, getKey(), blockCache,
                 getChr1Idx(), getChr2Idx(), getZoom(), normType);
     }

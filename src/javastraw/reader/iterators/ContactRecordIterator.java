@@ -76,6 +76,9 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
     @Override
     public boolean hasNext() {
         if (blockNumbers == null || blockNumbers.size() == 0) {
+            System.err.println("No blocks available. If working with hires, the resolution may have " +
+                    "been loaded with dynamic blocks. Reload the matrix class directly specifying " +
+                    "the resolution to resolve this issue.");
             return false;
         }
 

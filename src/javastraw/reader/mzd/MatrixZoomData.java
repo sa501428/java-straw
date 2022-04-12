@@ -28,10 +28,7 @@ package javastraw.reader.mzd;
 import javastraw.matrices.BasicMatrix;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
-import javastraw.reader.block.Block;
-import javastraw.reader.block.BlockModifier;
-import javastraw.reader.block.ContactRecord;
-import javastraw.reader.block.IdentityModifier;
+import javastraw.reader.block.*;
 import javastraw.reader.depth.LogDepth;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.expected.ExpectedValueFunction;
@@ -60,18 +57,23 @@ public class MatrixZoomData {
     protected DatasetReader reader;
     protected final Map<String, double[]> eigenvectorMap;
     protected final BlockModifier identity = new IdentityModifier();
-    protected double averageCount = -1;
+    protected final double sumCounts;
     public static boolean useIteratorDontPutAllInRAM = false;
     public static boolean shouldCheckRAMUsage = false;
+    private final BlockIndices blockIndices;
 
     public MatrixZoomData(Chromosome chr1, Chromosome chr2, HiCZoom zoom, int blockBinCount, int blockColumnCount,
-                          int[] chr1Sites, int[] chr2Sites, DatasetReader reader) {
+                          int[] chr1Sites, int[] chr2Sites, DatasetReader reader, BlockIndices blockIndices,
+                          boolean useCache, double sumCounts) {
         this.chr1 = chr1;
         this.chr2 = chr2;
         this.zoom = zoom;
         this.isIntra = chr1.getIndex() == chr2.getIndex();
         this.reader = reader;
         this.blockBinCount = blockBinCount;
+        this.blockIndices = blockIndices;
+        this.sumCounts = sumCounts;
+
         blockCache = new BlockCache();
         if (reader.getVersion() > 8) {
             v9Depth = V9Depth.setDepthMethod(reader.getDepthBase(), blockBinCount);
@@ -98,6 +100,7 @@ public class MatrixZoomData {
         }
         pearsonsMap = new HashMap<>();
         eigenvectorMap = new HashMap<>();
+        blockCache.setUseCache(useCache);
     }
 
     protected MatrixZoomData(MatrixZoomData zd0) {
@@ -110,14 +113,11 @@ public class MatrixZoomData {
         this.correctedBinCount = zd0.correctedBinCount;
         this.blockCache = zd0.blockCache;
         this.v9Depth = zd0.v9Depth;
-        this.averageCount = zd0.averageCount;
+        this.sumCounts = zd0.sumCounts;
         this.reader = zd0.reader;
         this.pearsonsMap = zd0.pearsonsMap;
         this.eigenvectorMap = zd0.eigenvectorMap;
-    }
-
-    public void setUseCache(boolean useCache) {
-        blockCache.setUseCache(useCache);
+        this.blockIndices = zd0.blockIndices;
     }
 
     public Chromosome getChr1() {
@@ -193,11 +193,11 @@ public class MatrixZoomData {
         if (reader.getVersion() > 8 && isIntra) {
             return V9IntraBlockReader.addNormalizedBlocksToListV9(blockList, (int) binX1, (int) binY1,
                     (int) binX2, (int) binY2, no, modifier, blockBinCount, v9Depth,
-                    blockColumnCount, blockCache, getKey(), chr1, chr2, zoom, reader);
+                    blockColumnCount, blockCache, getKey(), chr1, chr2, zoom, reader, blockIndices);
         } else {
             return LegacyVersionBlockReader.addNormalizedBlocksToList(blockList, (int) binX1, (int) binY1, (int) binX2,
                     (int) binY2, no, fillUnderDiagonal, modifier, blockBinCount, blockColumnCount, blockCache,
-                    getKey(), chr1, chr2, zoom, reader);
+                    getKey(), chr1, chr2, zoom, reader, blockIndices);
         }
     }
 
@@ -240,37 +240,26 @@ public class MatrixZoomData {
         }
     }
 
-    /**
-     * Returns the average count
-     *
-     * @return Average count
-     */
     public double getAverageCount() {
-        return averageCount;
-    }
-
-    /**
-     * Sets the average count
-     *
-     * @param averageCount Average count to set
-     */
-    public void setAverageCount(double averageCount) {
-        this.averageCount = averageCount;
+        long nBins1 = chr1.getLength() / zoom.getBinSize();
+        long nBins2 = chr2.getLength() / zoom.getBinSize();
+        return (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
     }
 
     public void clearCache() {
         blockCache.clear();
         pearsonsMap.clear();
         eigenvectorMap.clear();
+        if (blockIndices != null) blockIndices.clearCache();
     }
 
     public Iterator<ContactRecord> getDirectIterator() {
-        return new ContactRecordIterator(reader, getKey(), blockCache,
+        return new ContactRecordIterator(reader, blockIndices, getKey(), blockCache,
                 getChr1Idx(), getChr2Idx(), getZoom(), NormalizationHandler.NONE);
     }
 
     public Iterator<ContactRecord> getNormalizedIterator(NormalizationType normType) {
-        return new ContactRecordIterator(reader, getKey(), blockCache,
+        return new ContactRecordIterator(reader, blockIndices, getKey(), blockCache,
                 getChr1Idx(), getChr2Idx(), getZoom(), normType);
     }
 

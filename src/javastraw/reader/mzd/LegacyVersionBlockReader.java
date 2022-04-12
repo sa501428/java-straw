@@ -3,6 +3,7 @@ package javastraw.reader.mzd;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.block.Block;
+import javastraw.reader.block.BlockIndices;
 import javastraw.reader.block.BlockModifier;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
@@ -26,7 +27,7 @@ public class LegacyVersionBlockReader {
                                                         boolean getBelowDiagonal, BlockModifier modifier,
                                                         int blockBinCount, int blockColumnCount, BlockCache blockCache,
                                                         String zdKey, Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
-                                                        DatasetReader reader) {
+                                                        DatasetReader reader, BlockIndices blockIndices) {
 
         Set<Integer> blocksToLoad = new HashSet<>();
 
@@ -53,7 +54,7 @@ public class LegacyVersionBlockReader {
         }
 
         BlockLoader.actuallyLoadGivenBlocks(blockList, new ArrayList<>(blocksToLoad), norm, modifier, zdKey,
-                chrom1, chrom2, zoom, blockCache, reader);
+                chrom1, chrom2, zoom, blockCache, reader, blockIndices);
 
         return new ArrayList<>(new HashSet<>(blockList));
     }

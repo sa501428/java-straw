@@ -83,7 +83,6 @@ public class ReaderTools {
 
     static Pair<MatrixZoomData, Long> readMatrixZoomData(Chromosome chr1, Chromosome chr2, int[] chr1Sites, int[] chr2Sites,
                                                          long filePointer, String path, boolean useCache,
-                                                         Map<String, BlockIndex> blockIndexMap,
                                                          DatasetReader reader, int specificResolution) throws IOException {
         SeekableStream stream = ReaderTools.getValidStream(path, filePointer);
         LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
@@ -107,41 +106,31 @@ public class ReaderTools {
         int blockBinCount = dis.readInt();
         int blockColumnCount = dis.readInt();
 
-        MatrixZoomData zd = new MatrixZoomData(chr1, chr2, zoom, blockBinCount, blockColumnCount, chr1Sites, chr2Sites,
-                reader);
-        zd.setUseCache(useCache);
-
         int nBlocks = dis.readInt();
 
+        BlockIndices blockIndices;
         long currentFilePointer = filePointer + (9 * 4) + hicUnitStr.getBytes().length + 1; // i think 1 byte for 0 terminated string?
-
         if (specificResolution > 0) {
             if (binSize != specificResolution) {
                 int maxPossibleBlockNumber = blockColumnCount * blockColumnCount - 1;
-                DynamicBlockIndex blockIndex = new DynamicBlockIndex(ReaderTools.getValidStream(path), nBlocks, maxPossibleBlockNumber, currentFilePointer);
-                blockIndexMap.put(zd.getKey(), blockIndex);
+                blockIndices = new DynamicBlockIndices(ReaderTools.getValidStream(path), nBlocks, maxPossibleBlockNumber, currentFilePointer);
             } else {
-                BlockIndex blockIndex = new BlockIndex(nBlocks);
-                blockIndex.populateBlocks(dis);
-                blockIndexMap.put(zd.getKey(), blockIndex);
+                blockIndices = new BlockIndices(nBlocks);
+                blockIndices.populateBlocks(dis);
             }
         } else {
             if (binSize < StrawGlobals.dynamicResolutionLimit && StrawGlobals.allowDynamicBlockIndex) {
                 int maxPossibleBlockNumber = blockColumnCount * blockColumnCount - 1;
-                DynamicBlockIndex blockIndex = new DynamicBlockIndex(ReaderTools.getValidStream(path), nBlocks, maxPossibleBlockNumber, currentFilePointer);
-                blockIndexMap.put(zd.getKey(), blockIndex);
+                blockIndices = new DynamicBlockIndices(ReaderTools.getValidStream(path), nBlocks, maxPossibleBlockNumber, currentFilePointer);
             } else {
-                BlockIndex blockIndex = new BlockIndex(nBlocks);
-                blockIndex.populateBlocks(dis);
-                blockIndexMap.put(zd.getKey(), blockIndex);
+                blockIndices = new BlockIndices(nBlocks);
+                blockIndices.populateBlocks(dis);
             }
         }
         currentFilePointer += (nBlocks * 16L);
 
-        long nBins1 = chr1.getLength() / binSize;
-        long nBins2 = chr2.getLength() / binSize;
-        double avgCount = (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
-        zd.setAverageCount(avgCount);
+        MatrixZoomData zd = new MatrixZoomData(chr1, chr2, zoom, blockBinCount, blockColumnCount, chr1Sites, chr2Sites,
+                reader, blockIndices, useCache, sumCounts);
 
         stream.close();
         return new Pair<>(zd, currentFilePointer);

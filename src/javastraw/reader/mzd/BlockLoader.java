@@ -3,7 +3,9 @@ package javastraw.reader.mzd;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.block.Block;
+import javastraw.reader.block.BlockIndices;
 import javastraw.reader.block.BlockModifier;
+import javastraw.reader.block.IndexEntry;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 import javastraw.tools.ParallelizationTools;
@@ -19,7 +21,8 @@ public class BlockLoader {
     public static void actuallyLoadGivenBlocks(final List<Block> globalBlockList, List<Integer> blockIds,
                                                final NormalizationType no, BlockModifier modifier,
                                                final String zdKey, Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
-                                               BlockCache globalBlockCache, DatasetReader reader) {
+                                               BlockCache globalBlockCache, DatasetReader reader,
+                                               BlockIndices blockIndex) {
         final AtomicInteger errorCounter = new AtomicInteger();
         final Object listLock = new Object();
         final Object cacheLock = new Object();
@@ -38,7 +41,7 @@ public class BlockLoader {
                 String key = getBlockKey(zdKey, blockNumber, no);
                 try {
                     getBlockFromReader(blockList, no, modifier, zdKey, chrom1, chrom2, zoom, blockCache,
-                            reader, blockNumber, key);
+                            reader, blockNumber, key, blockIndex.getBlock(blockNumber));
                 } catch (IOException e) {
                     errorCounter.incrementAndGet();
                 }
@@ -61,9 +64,9 @@ public class BlockLoader {
     private static void getBlockFromReader(List<Block> blockList, NormalizationType no, BlockModifier modifier,
                                            String zdKey, Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
                                            BlockCache blockCache, DatasetReader reader,
-                                           int blockNumber, String key) throws IOException {
+                                           int blockNumber, String key, IndexEntry idx) throws IOException {
         Block b = reader.readNormalizedBlock(blockNumber, zdKey, no,
-                chrom1.getIndex(), chrom2.getIndex(), zoom);
+                chrom1.getIndex(), chrom2.getIndex(), zoom, idx);
         if (b == null) {
             b = new Block(blockNumber, key);
         }

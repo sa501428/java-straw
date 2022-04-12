@@ -30,7 +30,10 @@ import htsjdk.tribble.util.LittleEndianInputStream;
 import javastraw.StrawGlobals;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
-import javastraw.reader.block.*;
+import javastraw.reader.block.Block;
+import javastraw.reader.block.ContactRecord;
+import javastraw.reader.block.IndexEntry;
+import javastraw.reader.block.LargeIndexEntry;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.mzd.BlockLoader;
@@ -59,7 +62,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     private final Dataset dataset;
     private int version = -1;
     private Map<String, FragIndexEntry> fragmentSitesIndex;
-    private final Map<String, BlockIndex> blockIndexMap = Collections.synchronizedMap(new HashMap<>());
+    //private final Map<String, BlockIndex> blockIndexMap = Collections.synchronizedMap(new HashMap<>());
     private long masterIndexPos;
     private long normVectorFilePosition;
     private boolean activeStatus = true;
@@ -493,7 +496,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         for (int i = 0; i < nResolutions; i++) {
             try {
                 Pair<MatrixZoomData, Long> result = ReaderTools.readMatrixZoomData(chr1, chr2, chr1Sites, chr2Sites,
-                        currentFilePosition, path, useCache, blockIndexMap, this, specificResolution);
+                        currentFilePosition, path, useCache, this, specificResolution);
                 zdList.add(result.getFirst());
                 currentFilePosition = result.getSecond();
             } catch (Exception ee) {
@@ -525,12 +528,6 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             fragmentSitesCache.put(chromosome.getName(), chrSites);
         }
         return chrSites;
-    }
-
-    @Override
-    public List<Integer> getBlockNumbers(String zdKey) {
-        BlockIndex blockIndex = blockIndexMap.get(zdKey);
-        return blockIndex == null ? null : blockIndex.getBlockNumbers();
     }
 
     public Map<String, LargeIndexEntry> getNormVectorIndex() {
@@ -612,12 +609,13 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
     @Override
     public Block readNormalizedBlock(int blockNumber, String zdKey, NormalizationType no,
-                                     int chr1Index, int chr2Index, HiCZoom zoom) throws IOException {
+                                     int chr1Index, int chr2Index, HiCZoom zoom,
+                                     IndexEntry idx) throws IOException {
 
         if (no == null) {
             throw new IOException("Norm " + no + " is null");
         } else if (no.equals(NormalizationHandler.NONE)) {
-            return readBlock(blockNumber, zdKey);
+            return readBlock(blockNumber, zdKey, idx);
         } else {
             long[] timeDiffThings = new long[4];
             timeDiffThings[0] = System.currentTimeMillis();
@@ -635,7 +633,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             ListOfDoubleArrays nv1Data = nv1.getData();
             ListOfDoubleArrays nv2Data = nv2.getData();
             timeDiffThings[1] = System.currentTimeMillis();
-            Block rawBlock = readBlock(blockNumber, zdKey);
+            Block rawBlock = readBlock(blockNumber, zdKey, idx);
             timeDiffThings[2] = System.currentTimeMillis();
             if (rawBlock == null) return null;
 
@@ -656,125 +654,120 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         }
     }
 
-    private Block readBlock(int blockNumber, String zdKey) throws IOException {
+    private Block readBlock(int blockNumber, String zdKey, IndexEntry idx) throws IOException {
 
         long[] timeDiffThings = new long[6];
         timeDiffThings[0] = System.currentTimeMillis();
 
         Block b = null;
-        BlockIndex blockIndex = blockIndexMap.get(zdKey);
-        if (blockIndex != null) {
+        if (idx != null) {
 
-            IndexEntry idx = blockIndex.getBlock(blockNumber);
-            if (idx != null) {
+            //System.out.println(" blockIndexPosition:" + idx.position);
+            timeDiffThings[1] = System.currentTimeMillis();
+            byte[] compressedBytes = ReaderTools.seekAndFullyReadCompressedBytes(idx, path);
+            timeDiffThings[2] = System.currentTimeMillis();
+            byte[] buffer;
 
-                //System.out.println(" blockIndexPosition:" + idx.position);
-                timeDiffThings[1] = System.currentTimeMillis();
-                byte[] compressedBytes = ReaderTools.seekAndFullyReadCompressedBytes(idx, path);
-                timeDiffThings[2] = System.currentTimeMillis();
-                byte[] buffer;
+            try {
+                buffer = ReaderTools.decompress(compressedBytes);
+                timeDiffThings[3] = System.currentTimeMillis();
 
-                try {
-                    buffer = ReaderTools.decompress(compressedBytes);
-                    timeDiffThings[3] = System.currentTimeMillis();
+            } catch (Exception e) {
+                throw new RuntimeException("Block read error: " + e.getMessage());
+            }
 
-                } catch (Exception e) {
-                    throw new RuntimeException("Block read error: " + e.getMessage());
+            LittleEndianInputStream dis = new LittleEndianInputStream(new ByteArrayInputStream(buffer));
+            int nRecords = dis.readInt();
+            List<ContactRecord> records = new ArrayList<>(nRecords);
+            timeDiffThings[4] = System.currentTimeMillis();
+
+            if (version < 7) {
+                for (int i = 0; i < nRecords; i++) {
+                    int binX = dis.readInt();
+                    int binY = dis.readInt();
+                    float counts = dis.readFloat();
+                    records.add(new ContactRecord(binX, binY, counts));
+                }
+            } else {
+
+                int binXOffset = dis.readInt();
+                int binYOffset = dis.readInt();
+
+                boolean useShort = dis.readByte() == 0;
+                boolean useShortBinX = true, useShortBinY = true;
+                if (version > 8) {
+                    useShortBinX = dis.readByte() == 0;
+                    useShortBinY = dis.readByte() == 0;
                 }
 
-                LittleEndianInputStream dis = new LittleEndianInputStream(new ByteArrayInputStream(buffer));
-                int nRecords = dis.readInt();
-                List<ContactRecord> records = new ArrayList<>(nRecords);
-                timeDiffThings[4] = System.currentTimeMillis();
+                byte type = dis.readByte();
 
-                if (version < 7) {
-                    for (int i = 0; i < nRecords; i++) {
-                        int binX = dis.readInt();
-                        int binY = dis.readInt();
-                        float counts = dis.readFloat();
-                        records.add(new ContactRecord(binX, binY, counts));
-                    }
-                } else {
+                switch (type) {
+                    case 1:
+                        if (useShortBinX && useShortBinY) {
+                            // List-of-rows representation
+                            int rowCount = dis.readShort();
+                            for (int i = 0; i < rowCount; i++) {
+                                int binY = binYOffset + dis.readShort();
+                                ReaderTools.populateContactRecordsColShort(dis, records, binXOffset, useShort, binY);
+                            }
+                        } else if (useShortBinX) { // && !useShortBinY
+                            // List-of-rows representation
+                            int rowCount = dis.readInt();
+                            for (int i = 0; i < rowCount; i++) {
+                                int binY = binYOffset + dis.readInt();
+                                ReaderTools.populateContactRecordsColShort(dis, records, binXOffset, useShort, binY);
+                            }
+                        } else if (useShortBinY) { // && !useShortBinX
+                            // List-of-rows representation
+                            int rowCount = dis.readShort();
+                            for (int i = 0; i < rowCount; i++) {
+                                int binY = binYOffset + dis.readShort();
+                                ReaderTools.populateContactRecordsColInt(dis, records, binXOffset, useShort, binY);
+                            }
+                        } else {
+                            // List-of-rows representation
+                            int rowCount = dis.readInt();
+                            for (int i = 0; i < rowCount; i++) {
+                                int binY = binYOffset + dis.readInt();
+                                ReaderTools.populateContactRecordsColInt(dis, records, binXOffset, useShort, binY);
+                            }
+                        }
+                        break;
+                    case 2:
 
-                    int binXOffset = dis.readInt();
-                    int binYOffset = dis.readInt();
+                        int nPts = dis.readInt();
+                        int w = dis.readShort();
 
-                    boolean useShort = dis.readByte() == 0;
-                    boolean useShortBinX = true, useShortBinY = true;
-                    if (version > 8) {
-                        useShortBinX = dis.readByte() == 0;
-                        useShortBinY = dis.readByte() == 0;
-                    }
+                        for (int i = 0; i < nPts; i++) {
+                            //int idx = (p.y - binOffset2) * w + (p.x - binOffset1);
+                            int row = i / w;
+                            int col = i - row * w;
+                            int bin1 = binXOffset + col;
+                            int bin2 = binYOffset + row;
 
-                    byte type = dis.readByte();
-
-                    switch (type) {
-                        case 1:
-                            if (useShortBinX && useShortBinY) {
-                                // List-of-rows representation
-                                int rowCount = dis.readShort();
-                                for (int i = 0; i < rowCount; i++) {
-                                    int binY = binYOffset + dis.readShort();
-                                    ReaderTools.populateContactRecordsColShort(dis, records, binXOffset, useShort, binY);
-                                }
-                            } else if (useShortBinX) { // && !useShortBinY
-                                // List-of-rows representation
-                                int rowCount = dis.readInt();
-                                for (int i = 0; i < rowCount; i++) {
-                                    int binY = binYOffset + dis.readInt();
-                                    ReaderTools.populateContactRecordsColShort(dis, records, binXOffset, useShort, binY);
-                                }
-                            } else if (useShortBinY) { // && !useShortBinX
-                                // List-of-rows representation
-                                int rowCount = dis.readShort();
-                                for (int i = 0; i < rowCount; i++) {
-                                    int binY = binYOffset + dis.readShort();
-                                    ReaderTools.populateContactRecordsColInt(dis, records, binXOffset, useShort, binY);
+                            if (useShort) {
+                                short counts = dis.readShort();
+                                if (counts != Short.MIN_VALUE) {
+                                    records.add(new ContactRecord(bin1, bin2, counts));
                                 }
                             } else {
-                                // List-of-rows representation
-                                int rowCount = dis.readInt();
-                                for (int i = 0; i < rowCount; i++) {
-                                    int binY = binYOffset + dis.readInt();
-                                    ReaderTools.populateContactRecordsColInt(dis, records, binXOffset, useShort, binY);
+                                float counts = dis.readFloat();
+                                if (!Float.isNaN(counts)) {
+                                    records.add(new ContactRecord(bin1, bin2, counts));
                                 }
                             }
-                            break;
-                        case 2:
+                        }
 
-                            int nPts = dis.readInt();
-                            int w = dis.readShort();
-
-                            for (int i = 0; i < nPts; i++) {
-                                //int idx = (p.y - binOffset2) * w + (p.x - binOffset1);
-                                int row = i / w;
-                                int col = i - row * w;
-                                int bin1 = binXOffset + col;
-                                int bin2 = binYOffset + row;
-
-                                if (useShort) {
-                                    short counts = dis.readShort();
-                                    if (counts != Short.MIN_VALUE) {
-                                        records.add(new ContactRecord(bin1, bin2, counts));
-                                    }
-                                } else {
-                                    float counts = dis.readFloat();
-                                    if (!Float.isNaN(counts)) {
-                                        records.add(new ContactRecord(bin1, bin2, counts));
-                                    }
-                                }
-                            }
-
-                            break;
-                        default:
-                            throw new RuntimeException("Unknown block type: " + type);
-                    }
+                        break;
+                    default:
+                        throw new RuntimeException("Unknown block type: " + type);
                 }
-                b = new Block(blockNumber, records, BlockLoader.getBlockKey(zdKey, blockNumber, NormalizationHandler.NONE));
-                timeDiffThings[5] = System.currentTimeMillis();
-                for (int ii = 0; ii < timeDiffThings.length - 1; ii++) {
-                    globalTimeDiffThings[ii] += (timeDiffThings[ii + 1] - timeDiffThings[ii]) / 1000.0;
-                }
+            }
+            b = new Block(blockNumber, records, BlockLoader.getBlockKey(zdKey, blockNumber, NormalizationHandler.NONE));
+            timeDiffThings[5] = System.currentTimeMillis();
+            for (int ii = 0; ii < timeDiffThings.length - 1; ii++) {
+                globalTimeDiffThings[ii] += (timeDiffThings[ii + 1] - timeDiffThings[ii]) / 1000.0;
             }
         }
 

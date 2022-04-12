@@ -25,13 +25,13 @@
 package javastraw.reader;
 
 import javastraw.reader.block.Block;
+import javastraw.reader.block.IndexEntry;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 
 import java.io.IOException;
-import java.util.List;
 
 public interface DatasetReader {
 
@@ -46,9 +46,8 @@ public interface DatasetReader {
     Matrix readMatrix(String key, int resolution) throws IOException;
 
     Block readNormalizedBlock(int blockNumber, String zdKey, NormalizationType no,
-                              int chr1Index, int chr2Index, HiCZoom zoom) throws IOException;
-
-    List<Integer> getBlockNumbers(String zdKey);
+                              int chr1Index, int chr2Index, HiCZoom zoom,
+                              IndexEntry idx) throws IOException;
 
     NormalizationVector readNormalizationVector(NormalizationType type, int chrIdx, HiCZoom.HiCUnit unit, int binSize) throws IOException;
 

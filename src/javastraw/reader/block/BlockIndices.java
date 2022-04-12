@@ -32,13 +32,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class BlockIndex {
-    protected final Map<Integer, IndexEntry> blockIndex;
+public class BlockIndices {
+    protected final Map<Integer, IndexEntry> blockIndices;
     protected final int numBlocks;
 
-    public BlockIndex(int nBlocks) {
+    public BlockIndices(int nBlocks) {
         numBlocks = nBlocks;
-        blockIndex = new HashMap<>(nBlocks);
+        blockIndices = new HashMap<>(nBlocks);
     }
 
     public void populateBlocks(LittleEndianInputStream dis) throws IOException {
@@ -46,15 +46,19 @@ public class BlockIndex {
             int blockNumber = dis.readInt();
             long filePosition = dis.readLong();
             int blockSizeInBytes = dis.readInt();
-            blockIndex.put(blockNumber, new IndexEntry(filePosition, blockSizeInBytes));
+            blockIndices.put(blockNumber, new IndexEntry(filePosition, blockSizeInBytes));
         }
     }
 
     public List<Integer> getBlockNumbers() {
-        return new ArrayList<>(blockIndex.keySet());
+        return new ArrayList<>(blockIndices.keySet());
     }
 
     public IndexEntry getBlock(int blockNumber) {
-        return blockIndex.get(blockNumber);
+        return blockIndices.get(blockNumber);
+    }
+
+    public void clearCache() {
+        blockIndices.clear();
     }
 }

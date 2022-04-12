@@ -83,7 +83,7 @@ public class Dataset {
         }
         eigenvectorCache.clear();
         normalizationVectorCache.clear();
-        normalizationTypes.clear();
+        matrices.clear();
     }
 
     public Matrix getMatrix(Chromosome chr1, Chromosome chr2) {

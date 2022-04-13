@@ -58,9 +58,9 @@ public class MatrixZoomData {
     protected final Map<String, double[]> eigenvectorMap;
     protected final BlockModifier identity = new IdentityModifier();
     protected final double sumCounts;
-    public static boolean useIteratorDontPutAllInRAM = false;
-    public static boolean shouldCheckRAMUsage = false;
-    private final BlockIndices blockIndices;
+    protected static boolean useIteratorDontPutAllInRAM = false;
+    protected static boolean shouldCheckRAMUsage = false;
+    protected final BlockIndices blockIndices;
 
     public MatrixZoomData(Chromosome chr1, Chromosome chr2, HiCZoom zoom, int blockBinCount, int blockColumnCount,
                           int[] chr1Sites, int[] chr2Sites, DatasetReader reader, BlockIndices blockIndices,

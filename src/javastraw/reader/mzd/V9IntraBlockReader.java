@@ -3,6 +3,7 @@ package javastraw.reader.mzd;
 import javastraw.reader.DatasetReader;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.block.Block;
+import javastraw.reader.block.BlockIndices;
 import javastraw.reader.block.BlockModifier;
 import javastraw.reader.depth.V9Depth;
 import javastraw.reader.type.HiCZoom;
@@ -19,7 +20,7 @@ public class V9IntraBlockReader {
                                                           int blockBinCount, V9Depth v9Depth,
                                                           int blockColumnCount, BlockCache blockCache, String zdKey,
                                                           Chromosome chrom1, Chromosome chrom2, HiCZoom zoom,
-                                                          DatasetReader reader) {
+                                                          DatasetReader reader, BlockIndices blockIndex) {
         List<Integer> blockNumbersToLoad = getBlockNumbersForRegionFromBinPosition(binX1, binX2,
                 binY1, binY2, blockBinCount, blockColumnCount, v9Depth);
 
@@ -29,7 +30,7 @@ public class V9IntraBlockReader {
                 blockCache, zdKey);
 
         BlockLoader.actuallyLoadGivenBlocks(blockList, new ArrayList<>(blocksToLoad), norm, modifier, zdKey,
-                chrom1, chrom2, zoom, blockCache, reader);
+                chrom1, chrom2, zoom, blockCache, reader, blockIndex);
 
         return blockList;
     }

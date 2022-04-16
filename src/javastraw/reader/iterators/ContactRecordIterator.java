@@ -26,6 +26,7 @@ package javastraw.reader.iterators;
 
 import javastraw.reader.DatasetReader;
 import javastraw.reader.block.Block;
+import javastraw.reader.block.BlockIndices;
 import javastraw.reader.block.ContactRecord;
 import javastraw.reader.mzd.BlockCache;
 import javastraw.reader.mzd.BlockLoader;
@@ -42,7 +43,7 @@ import java.util.List;
 public class ContactRecordIterator implements Iterator<ContactRecord> {
 
     private final List<Integer> blockNumbers;
-    private int blockIdx;
+    private final BlockIndices blockIndices;
     private Iterator<ContactRecord> currentBlockIterator;
     private final DatasetReader reader;
     private final String zdKey;
@@ -50,21 +51,23 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
     private final int chr1Idx, chr2Idx;
     private final HiCZoom zoom;
     private final NormalizationType normType;
+    private int currentBlockIdx;
 
     /**
      * Initializes the iterator
      */
-    public ContactRecordIterator(DatasetReader reader, String zdKey, BlockCache blockCache,
+    public ContactRecordIterator(DatasetReader reader, BlockIndices blockIndices, String zdKey, BlockCache blockCache,
                                  int chr1Idx, int chr2Idx, HiCZoom zoom, NormalizationType normType) {
         this.reader = reader;
+        this.blockIndices = blockIndices;
         this.zdKey = zdKey;
         this.chr1Idx = chr1Idx;
         this.chr2Idx = chr2Idx;
         this.zoom = zoom;
         this.blockCache = blockCache;
-        this.blockIdx = -1;
+        this.currentBlockIdx = -1;
         this.normType = normType;
-        this.blockNumbers = reader.getBlockNumbers(zdKey);
+        this.blockNumbers = blockIndices.getBlockNumbers();
     }
 
     /**
@@ -75,14 +78,20 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
      */
     @Override
     public boolean hasNext() {
+        if (blockNumbers == null || blockNumbers.size() == 0) {
+            System.err.println("No blocks available. If working with hires, the resolution may have " +
+                    "been loaded with dynamic blocks. Reload the matrix class directly specifying " +
+                    "the resolution to resolve this issue.");
+            return false;
+        }
 
         if (currentBlockIterator != null && currentBlockIterator.hasNext()) {
             return true;
         } else {
-            blockIdx++;
-            while (blockIdx < blockNumbers.size()) {
+            currentBlockIdx++;
+            while (currentBlockIdx < blockNumbers.size()) {
                 try {
-                    int blockNumber = blockNumbers.get(blockIdx);
+                    int blockNumber = blockNumbers.get(currentBlockIdx);
 
                     // Optionally check the cache
                     String key = BlockLoader.getBlockKey(zdKey, blockNumber, normType);
@@ -91,7 +100,7 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
                         nextBlock = blockCache.get(key);
                     } else {
                         nextBlock = reader.readNormalizedBlock(blockNumber, zdKey, normType,
-                                chr1Idx, chr2Idx, zoom);
+                                chr1Idx, chr2Idx, zoom, blockIndices.getBlock(blockNumber));
                     }
                     List<ContactRecord> contactRecords = nextBlock.getContactRecords();
                     if (contactRecords != null && contactRecords.size() > 0) {
@@ -102,9 +111,11 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
                     System.err.println("Error fetching block " + e.getMessage());
                     return false;
                 }
-                blockIdx++;
+                currentBlockIdx++;
             }
         }
+
+        blockNumbers.clear(); // done with iterator
 
         return false;
     }

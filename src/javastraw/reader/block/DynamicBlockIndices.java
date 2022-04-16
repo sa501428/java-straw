@@ -32,7 +32,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
 
-public class DynamicBlockIndex extends BlockIndex {
+public class DynamicBlockIndices extends BlockIndices {
 
     private final int maxBlocks;
     private final long minPosition, maxPosition;
@@ -40,12 +40,12 @@ public class DynamicBlockIndex extends BlockIndex {
     private Long mapFileBoundsMin = null, mapFileBoundsMax = null;
     private final SeekableStream stream;
 
-    public DynamicBlockIndex(SeekableStream stream, int numBlocks, int maxBlocks, long minPosition) {
-        super(numBlocks);
+    public DynamicBlockIndices(SeekableStream stream, int numBlocks, int maxBlocks, long minPosition) {
+        super(numBlocks / 2); // when using dynamic blocks, the idea is to not load every single block?
         this.stream = stream;
         this.maxBlocks = maxBlocks;
         this.minPosition = minPosition;
-        maxPosition = minPosition + numBlocks * 16;
+        maxPosition = minPosition + numBlocks * 16L;
     }
 
 
@@ -59,8 +59,8 @@ public class DynamicBlockIndex extends BlockIndex {
     public IndexEntry getBlock(int blockNumber) {
         if (blockNumber > maxBlocks) {
             return null;
-        } else if (blockIndex.containsKey(blockNumber)) {
-            return blockIndex.get(blockNumber);
+        } else if (blockIndices.containsKey(blockNumber)) {
+            return blockIndices.get(blockNumber);
         } else if (blockNumber == 0) {
             try {
                 return searchForBlockIndexEntry(blockNumber, this.minPosition, this.minPosition + 16);
@@ -109,7 +109,7 @@ public class DynamicBlockIndex extends BlockIndex {
                     int blockNumberFound = dis.readInt();
                     long filePosition = dis.readLong();
                     int blockSizeInBytes = dis.readInt();
-                    blockIndex.put(blockNumberFound, new IndexEntry(filePosition, blockSizeInBytes));
+                    blockIndices.put(blockNumberFound, new IndexEntry(filePosition, blockSizeInBytes));
                     if (firstBlockNumber == null) firstBlockNumber = blockNumberFound;
                     lastBlockNumber = blockNumberFound;
                     pointer += 16;
@@ -122,7 +122,7 @@ public class DynamicBlockIndex extends BlockIndex {
                 blockNumberRangeMax = lastBlockNumber;
             }
 
-            return blockIndex.get(blockNumber);
+            return blockIndices.get(blockNumber);
         }
         // Midpoint in units of 16 byte chunks
         int nEntries = (int) ((boundsMax - boundsMin) / 16);
@@ -141,8 +141,8 @@ public class DynamicBlockIndex extends BlockIndex {
             blockSizeInBytes = dis.readInt();
         }
         if (blockNumberFound == blockNumber) {
-            blockIndex.put(blockNumberFound, new IndexEntry(filePosition, blockSizeInBytes));
-            return blockIndex.get(blockNumber);
+            blockIndices.put(blockNumberFound, new IndexEntry(filePosition, blockSizeInBytes));
+            return blockIndices.get(blockNumber);
         } else if (blockNumber > blockNumberFound) {
             return searchForBlockIndexEntry(blockNumber, positionToSeek + 16, boundsMax);
         } else {

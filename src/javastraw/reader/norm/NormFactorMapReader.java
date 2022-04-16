@@ -1,7 +1,10 @@
 package javastraw.reader.norm;
 
+import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.tribble.util.LittleEndianInputStream;
+import javastraw.reader.ReaderTools;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -10,10 +13,13 @@ public class NormFactorMapReader {
     private final int version, nFactors;
     private final Map<Integer, Double> normFactors = new LinkedHashMap<>();
 
-    public NormFactorMapReader(int nFactors, int version, LittleEndianInputStream dis)
+    public NormFactorMapReader(int nFactors, int version, long position, String path)
             throws IOException {
         this.version = version;
         this.nFactors = nFactors;
+
+        SeekableStream stream = ReaderTools.getValidStream(path, position);
+        LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, getOffset()));
 
         for (int j = 0; j < nFactors; j++) {
             int chrIdx = dis.readInt();

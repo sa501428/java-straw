@@ -43,7 +43,9 @@ public class DynamicMatrixZoomData extends MatrixZoomData {
      * @param zoom
      */
     public DynamicMatrixZoomData(HiCZoom zoom, MatrixZoomData higherResZD) {
-        super(higherResZD.chr1, higherResZD.chr2, zoom, higherResZD.blockBinCount, higherResZD.blockColumnCount, new int[0], new int[0], null);
+        super(higherResZD.chr1, higherResZD.chr2, zoom, higherResZD.blockBinCount,
+                higherResZD.blockColumnCount, new int[0], new int[0], null, null,
+                true, higherResZD.sumCounts);
         this.higherResZD = higherResZD;
         scaleFactor = zoom.getBinSize() / higherResZD.getBinSize();
     }

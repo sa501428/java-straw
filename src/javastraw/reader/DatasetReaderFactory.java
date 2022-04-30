@@ -37,12 +37,12 @@ import java.net.URL;
 
 public class DatasetReaderFactory {
 
-    public static DatasetReaderV2 getReaderForFile(String file, boolean useCache) throws IOException {
+    public static DatasetReaderV2 getReaderForFile(String file, boolean useCache, boolean useDynamicBlockIndex) throws IOException {
         String magicString = getMagicString(file);
 
         if (magicString != null) {
             if (magicString.equals("HIC")) {
-                return new DatasetReaderV2(file, useCache);
+                return new DatasetReaderV2(file, useCache, useDynamicBlockIndex);
             } else {
                 System.err.println("This version is deprecated and is no longer supported.");
                 //reader = new DatasetReaderV1(file);

@@ -46,7 +46,8 @@ import java.util.*;
  */
 public class HiCFileTools {
 
-    public static Dataset extractDatasetForCLT(String filename, boolean allowPrinting, boolean useCache) {
+    public static Dataset extractDatasetForCLT(String filename, boolean allowPrinting,
+                                               boolean useCache, boolean useDynamicBlockIndex) {
         Dataset dataset = null;
         String file = filename;
         if (isDropboxURL(file)) {
@@ -55,7 +56,7 @@ public class HiCFileTools {
 
         try {
             DatasetReader reader = null;
-            reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader);
+            reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader, useDynamicBlockIndex);
             dataset = reader.read();
             verifySupportedHiCFileVersion(reader.getVersion());
         } catch (Exception e) {
@@ -67,12 +68,14 @@ public class HiCFileTools {
     }
 
     @NotNull
-    private static DatasetReader getDatasetVerifyMagicString(boolean allowPrinting, boolean useCache, String file, DatasetReader reader) throws IOException {
+    private static DatasetReader getDatasetVerifyMagicString(boolean allowPrinting, boolean useCache,
+                                                             String file, DatasetReader reader,
+                                                             boolean useDynamicBlockIndex) throws IOException {
         if (allowPrinting)
             System.out.println("Reading file: " + file);
         String magicString = DatasetReaderFactory.getMagicString(file);
         if (magicString.equals("HIC")) {
-            reader = new DatasetReaderV2(file, useCache);
+            reader = new DatasetReaderV2(file, useCache, useDynamicBlockIndex);
         } else {
             System.err.println("This version of HIC is no longer supported");
             System.exit(32);
@@ -87,14 +90,15 @@ public class HiCFileTools {
         }
     }
 
-    public static DatasetReader extractDatasetReaderForCLT(List<String> files, boolean allowPrinting, boolean useCache) {
+    public static DatasetReader extractDatasetReaderForCLT(List<String> files, boolean allowPrinting,
+                                                           boolean useCache, boolean useDynamicBlockIndex) {
         DatasetReader reader = null;
         String file = files.get(0);
         if (isDropboxURL(file)) {
             file = cleanUpDropboxURL(file);
         }
         try {
-            reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader);
+            reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader, useDynamicBlockIndex);
 
         } catch (Exception e) {
             System.err.println("Could not read hic file: " + e.getMessage());
@@ -334,25 +338,18 @@ public class HiCFileTools {
 
         List<Block> blocks = Collections.synchronizedList(new ArrayList<>());
 
-        int numDataReadingErrors = 0;
 
         try {
             blocks.addAll(zd.getNormalizedBlocksOverlapping(binXStart, binYStart, binXEnd, binYEnd, normalizationType,
                     fillUnderDiagonal));
         } catch (Exception e) {
             triggerNormError(normalizationType);
-            if (StrawGlobals.printVerboseComments) {
-                System.err.println("You do not have " + normalizationType + " normalized maps available for this resolution/region:");
-                System.err.println("x1 " + binXStart + " x2 " + binXEnd + " y1 " + binYStart + " y2 " + binYEnd + " res " + zd.getBinSize());
-                System.err.println("Map is likely too sparse or a different normalization/resolution should be chosen.");
-                e.printStackTrace();
-                System.exit(38);
-            }
-        }
 
-        if (StrawGlobals.printVerboseComments && numDataReadingErrors > 0) {
-            //System.err.println(numDataReadingErrors + " errors while reading data from region. Map is likely too sparse");
-            triggerNormError(normalizationType);
+            System.err.println("You do not have " + normalizationType + " normalized maps available for this resolution/region:");
+            System.err.println("x1 " + binXStart + " x2 " + binXEnd + " y1 " + binYStart + " y2 " + binYEnd + " res " + zd.getBinSize());
+            System.err.println("Map is likely too sparse or a different normalization/resolution should be chosen.");
+            e.printStackTrace();
+            System.exit(38);
         }
 
         return blocks;

@@ -24,8 +24,6 @@
 
 package javastraw.tools;
 
-import javastraw.StrawGlobals;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -64,9 +62,7 @@ public class ParallelizationTools {
             service.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
         } catch (InterruptedException e) {
             System.err.println("Error " + e.getLocalizedMessage());
-            if (StrawGlobals.printVerboseComments) {
-                e.printStackTrace();
-            }
+            e.printStackTrace();
         }
 
         // error printing

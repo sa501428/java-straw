@@ -56,8 +56,8 @@ public class UNIXTools {
         return folder;
     }
 
-    public static void redirectOutput(List<String> command, String outputFilePath) {
-        String output = executeComplexCommand(command);
+    public static void redirectOutput(List<String> command, String outputFilePath, boolean printVerbose) {
+        String output = executeComplexCommand(command, printVerbose);
         File outputFile = new File(outputFilePath);
         try {
             outputFile.createNewFile();
@@ -88,7 +88,7 @@ public class UNIXTools {
         return output.toString();
     }
 
-    private static String executeComplexCommand(List<String> command) {
+    private static String executeComplexCommand(List<String> command, boolean printVerboseComments) {
         StringBuilder output = new StringBuilder();
 
         //System.out.println(System.getenv());
@@ -102,7 +102,7 @@ public class UNIXTools {
             //p = Runtime.getRuntime().exec(command);
             p = b.redirectErrorStream(true).start();
 
-            if (StrawGlobals.printVerboseComments) {
+            if (printVerboseComments) {
                 System.out.println("Command exec " + p.waitFor());
             } else {
                 p.waitFor();

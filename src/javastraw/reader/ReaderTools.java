@@ -28,6 +28,7 @@ import java.util.Map;
 
 public class ReaderTools {
 
+    private final static int dynamicResolutionLimit = 50;
     private static final IGVSeekableStreamFactory streamFactory = IGVSeekableStreamFactory.getInstance();
     private static final int maxLengthEntryName = 100;
     private static final int MAX_BYTE_READ_SIZE = Integer.MAX_VALUE - 10;
@@ -83,7 +84,8 @@ public class ReaderTools {
 
     static Pair<MatrixZoomData, Long> readMatrixZoomData(Chromosome chr1, Chromosome chr2, int[] chr1Sites, int[] chr2Sites,
                                                          long filePointer, String path, boolean useCache,
-                                                         DatasetReader reader, int specificResolution) throws IOException {
+                                                         DatasetReader reader, int specificResolution,
+                                                         boolean allowDynamicBlockIndex) throws IOException {
         SeekableStream stream = ReaderTools.getValidStream(path, filePointer);
         LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
@@ -119,7 +121,7 @@ public class ReaderTools {
                 blockIndices.populateBlocks(dis);
             }
         } else {
-            if (binSize < StrawGlobals.dynamicResolutionLimit && StrawGlobals.allowDynamicBlockIndex) {
+            if (allowDynamicBlockIndex && binSize < dynamicResolutionLimit) {
                 int maxPossibleBlockNumber = blockColumnCount * blockColumnCount - 1;
                 blockIndices = new DynamicBlockIndices(ReaderTools.getValidStream(path), nBlocks, maxPossibleBlockNumber, currentFilePointer);
             } else {

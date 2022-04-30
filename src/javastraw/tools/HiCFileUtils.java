@@ -45,13 +45,13 @@ class HiCFileUtils {
 
     private final Dataset dataset;
 
-    private HiCFileUtils(String hicfile, boolean useCache) throws IOException {
-        DatasetReaderV2 reader = new DatasetReaderV2(hicfile, useCache);
+    private HiCFileUtils(String hicfile, boolean useCache, boolean useDynamicBlockIndex) throws IOException {
+        DatasetReaderV2 reader = new DatasetReaderV2(hicfile, useCache, useDynamicBlockIndex);
         dataset = reader.read();
     }
 
     public static void main(String[] args) throws IOException {
-        HiCFileUtils utils = new HiCFileUtils(args[0], false);
+        HiCFileUtils utils = new HiCFileUtils(args[0], false, true);
         utils.dumpNormalizationVectors(NormalizationHandler.KR, "1", HiCZoom.HiCUnit.BP, 250000);
         utils.dumpExpectedVectors(NormalizationHandler.KR, HiCZoom.HiCUnit.BP, 1000000);
     }
@@ -114,5 +114,4 @@ class HiCFileUtils {
         }
         return null;
     }
-
 }

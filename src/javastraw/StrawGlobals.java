@@ -25,12 +25,7 @@
 package javastraw;
 
 public class StrawGlobals {
-    public static final String versionNum = "2.14.03";
+    public static final String versionNum = "2.15.01";
     public static final int minVersion = 6;
     public static final int bufferSize = 2097152;
-
-    public static boolean allowDynamicBlockIndex = true;
-    public static int dynamicResolutionLimit = 50;
-
-    public static boolean printVerboseComments = false;
 }

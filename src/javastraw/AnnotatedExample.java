@@ -23,7 +23,7 @@ public class AnnotatedExample {
         String filename = "file.hic";
 
         // create a hic dataset object
-        Dataset ds = HiCFileTools.extractDatasetForCLT(filename, false, useCache);
+        Dataset ds = HiCFileTools.extractDatasetForCLT(filename, false, useCache, false);
 
         // pick the normalization we would like
         // this line will check multiple possible norms

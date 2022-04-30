@@ -17,7 +17,7 @@ import java.util.List;
 
 public class IterationUtils {
     public static void processDataset(String path, int resolution, int id1) {
-        Dataset ds1 = HiCFileTools.extractDatasetForCLT(path, true, false);
+        Dataset ds1 = HiCFileTools.extractDatasetForCLT(path, true, false, false);
         Chromosome[] array = ds1.getChromosomeHandler().getChromosomeArrayWithoutAllByAll();
         List<NormalizationType> norms = ds1.getNormalizationTypes();
         HiCZoom zoom = ds1.getZoomForBPResolution(resolution);

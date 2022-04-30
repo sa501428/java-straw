@@ -67,12 +67,13 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
     private long normVectorFilePosition;
     private boolean activeStatus = true;
     public static double[] globalTimeDiffThings = new double[5];
-    private final boolean useCache;
+    private final boolean useCache, allowDynamicBlockIndex;
     private long nviHeaderPosition;
 
-    public DatasetReaderV2(String path, boolean useCache) {
+    public DatasetReaderV2(String path, boolean useCache, boolean useDynamicBlockIndex) {
         super(path);
         this.useCache = useCache;
+        this.allowDynamicBlockIndex = useDynamicBlockIndex;
         dataset = new Dataset(this);
     }
 
@@ -351,15 +352,12 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             SeekableStream stream = ReaderTools.getValidStream(path, currentPosition);
             LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
-
             int nNormExpectedValueVectors;
             try {
                 nNormExpectedValueVectors = dis.readInt();
                 currentPosition += 4;
             } catch (EOFException | HttpResponseException e) {
-                if (StrawGlobals.printVerboseComments) {
-                    System.out.println("No normalization vectors");
-                }
+                System.err.println("No normalization vectors");
                 return;
             }
 
@@ -375,9 +373,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             }
 
             // Normalization vectors (indexed)
-            if (StrawGlobals.printVerboseComments) {
-                System.out.println("NVI " + currentPosition);
-            }
+            // System.out.println("NVI " + currentPosition);
 
             stream.seek(currentPosition);
             dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
@@ -496,7 +492,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         for (int i = 0; i < nResolutions; i++) {
             try {
                 Pair<MatrixZoomData, Long> result = ReaderTools.readMatrixZoomData(chr1, chr2, chr1Sites, chr2Sites,
-                        currentFilePosition, path, useCache, this, specificResolution);
+                        currentFilePosition, path, useCache, this, specificResolution, allowDynamicBlockIndex);
                 zdList.add(result.getFirst());
                 currentFilePosition = result.getSecond();
             } catch (Exception ee) {
@@ -624,10 +620,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             NormalizationVector nv2 = dataset.getNormalizationVector(chr2Index, zoom, no);
 
             if (nv1 == null || nv2 == null) {
-                if (StrawGlobals.printVerboseComments) { // todo should this print an error always instead?
-                    System.err.println("Norm " + no + " missing for: " + zdKey);
-                    System.err.println(nv1 + " - " + nv2);
-                }
+                System.err.println("Norm " + no + " missing for: " + zdKey + "\n" + nv1 + " - " + nv2);
                 return null;
             }
             ListOfDoubleArrays nv1Data = nv1.getData();

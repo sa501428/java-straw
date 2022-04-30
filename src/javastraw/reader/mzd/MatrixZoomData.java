@@ -58,8 +58,6 @@ public class MatrixZoomData {
     protected final Map<String, double[]> eigenvectorMap;
     protected final BlockModifier identity = new IdentityModifier();
     protected final double sumCounts;
-    protected static boolean useIteratorDontPutAllInRAM = false;
-    protected static boolean shouldCheckRAMUsage = false;
     protected final BlockIndices blockIndices;
 
     public MatrixZoomData(Chromosome chr1, Chromosome chr2, HiCZoom zoom, int blockBinCount, int blockColumnCount,

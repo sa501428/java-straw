@@ -58,6 +58,10 @@ public class Block implements Comparable<Block> {
         return records;
     }
 
+    public void clear() {
+        records.clear();
+    }
+
     @Override
     public int compareTo(Block o) {
         if (this == o) return 0;

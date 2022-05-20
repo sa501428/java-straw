@@ -251,6 +251,16 @@ public class MatrixZoomData {
         if (blockIndices != null) blockIndices.clearCache();
     }
 
+    public Integer getBlockSize(int blockNum) {
+        Integer blockSize;
+        if (blockIndices != null) {
+            blockSize = blockIndices.getBlockSize(blockNum);
+        } else {
+            blockSize = null;
+        }
+        return blockSize;
+    }
+
     public Iterator<ContactRecord> getDirectIterator() {
         return new ContactRecordIterator(reader, blockIndices, getKey(), blockCache,
                 getChr1Idx(), getChr2Idx(), getZoom(), NormalizationHandler.NONE);

@@ -28,10 +28,10 @@ public class BlockLoader {
         final Object cacheLock = new Object();
         final Set<Block> globalBlockSet = new HashSet<>();
 
-        int numJobs = Math.min(blockIds.size(), 100);
+        int numJobs = Math.min(blockIds.size(), 8);
         AtomicInteger index = new AtomicInteger(0);
 
-        ParallelizationTools.launchParallelizedCode(10, () -> { //numJobs
+        ParallelizationTools.launchParallelizedCode(numJobs, () -> { //numJobs
             List<Block> blockList = new ArrayList<>();
             BlockCache blockCache = new BlockCache();
 

@@ -25,7 +25,12 @@ public class BlockCache {
     }
 
     public Block get(String key) {
-        return cache.get(key);
+        if (useCache) {
+            return cache.get(key);
+        }
+        System.err.println("Invalid situation - cache is not set");
+        System.exit(9);
+        return null;
     }
 
     public void setUseCache(boolean useCache) {
@@ -36,9 +41,15 @@ public class BlockCache {
     }
 
     public void addAll(BlockCache other) {
-        Set<String> keys = new HashSet<>(other.cache.keySet());
-        for (String key : keys) {
-            cache.put(key, other.cache.get(key));
+        if (useCache) {
+            Set<String> keys = new HashSet<>(other.cache.keySet());
+            for (String key : keys) {
+                cache.put(key, other.cache.get(key));
+            }
         }
+    }
+
+    public boolean getUseCache() {
+        return useCache;
     }
 }

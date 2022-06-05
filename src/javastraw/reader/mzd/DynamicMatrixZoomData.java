@@ -67,6 +67,11 @@ public class DynamicMatrixZoomData extends MatrixZoomData {
 
         Map<Integer, Map<Integer, ContactRecord>> condensedRecords = new HashMap<>();
 
+        if (!blockCache.getUseCache()) {
+            System.err.println("Need cache enabled");
+            System.exit(78);
+        }
+
         for (Block b : highResBlocks) {
             for (ContactRecord record : b.getContactRecords()) {
                 int binX = record.getBinX() / scaleFactor;

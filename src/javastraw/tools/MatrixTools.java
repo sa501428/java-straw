@@ -63,7 +63,7 @@ public class MatrixTools {
     /**
      * @return matrix of size m x n initialized with a specified value
      */
-    private static RealMatrix presetValueMatrix(int numRows, int numCols, int val) {
+    public static RealMatrix presetValueMatrix(int numRows, int numCols, int val) {
         RealMatrix matrix = new Array2DRowRealMatrix(numRows, numCols);
         for (int r = 0; r < numRows; r++)
             for (int c = 0; c < numCols; c++)
@@ -79,7 +79,7 @@ public class MatrixTools {
      * @param cols number of columns
      * @return randomized binary matrix
      */
-    private static RealMatrix randomUnitMatrix(int rows, int cols) {
+    public static RealMatrix randomUnitMatrix(int rows, int cols) {
         Random generator = new Random();
         RealMatrix matrix = cleanArray2DMatrix(rows, cols);
         for (int r = 0; r < rows; r++)
@@ -93,7 +93,7 @@ public class MatrixTools {
     /**
      * @return minimal positive entry in the matrix greater than 0
      */
-    private static double minimumPositive(double[][] data) {
+    public static double minimumPositive(double[][] data) {
         double minVal = Double.MAX_VALUE;
         for (double[] row : data) {
             for (double val : row) {
@@ -199,7 +199,7 @@ public class MatrixTools {
      * @param numCols
      * @return properly dimensioned matrix
      */
-    private static float[][] reshapeFlatMatrix(float[] flatMatrix, int numRows, int numCols) {
+    public static float[][] reshapeFlatMatrix(float[] flatMatrix, int numRows, int numCols) {
         float[][] matrix = new float[numRows][numCols];
 
         for (int i = 0; i < numRows; i++) {
@@ -462,7 +462,7 @@ public class MatrixTools {
     /**
      * print for 2D array
      */
-    private static void print(double[][] data) {
+    public static void print(double[][] data) {
         for (double[] row : data) {
             System.out.println(Arrays.toString(row));
         }
@@ -471,7 +471,7 @@ public class MatrixTools {
     /**
      * print for 2D array
      */
-    private static void print(float[][] data) {
+    public static void print(float[][] data) {
         for (float[] row : data) {
             System.out.println(Arrays.toString(row));
         }
@@ -662,7 +662,7 @@ public class MatrixTools {
         return getAverage(data.getData());
     }
 
-    private static double getAverage(double[][] data) {
+    public static double getAverage(double[][] data) {
         double average = 0;
         if (data.length > 0) {
             double total = 0;
@@ -875,7 +875,7 @@ public class MatrixTools {
                 convertToFloatMatrix(matrix1vs2.getData()));
     }
 
-    private static float[][] generateCompositeMatrixWithNansCleaned(float[][] matrixDiag1, float[][] matrixDiag2, float[][] matrix1vs2) {
+    public static float[][] generateCompositeMatrixWithNansCleaned(float[][] matrixDiag1, float[][] matrixDiag2, float[][] matrix1vs2) {
         int newLength = matrixDiag1.length + matrixDiag2.length;
         float[][] compositeMatrix = new float[newLength][newLength];
 

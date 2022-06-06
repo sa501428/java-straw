@@ -432,6 +432,44 @@ public class HiCFileTools {
         return blocks;
     }
 
+    public static RealMatrix extractLocalBoundedExpectedRegion(ExpectedValueFunction df, Chromosome chr, int binXStart,
+                                                               int binYStart, int numRows, int numCols) {
+
+        // numRows/numCols is just to ensure a set size in case bounds are approximate
+        // left upper corner is reference for 0,0
+        // List<Block> blocks = getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd, normalizationType, fillUnderDiagonal);
+
+        RealMatrix data = MatrixTools.cleanArray2DMatrix(numRows, numCols);
+        for (int relativeX = 0; relativeX < numRows; relativeX++) {
+            for (int relativeY = 0; relativeY < numRows; relativeY++) {
+                int dist = Math.abs((binXStart - binYStart) + (relativeX - relativeY));
+                double expected = df.getExpectedValue(chr.getIndex(), dist);
+                data.addToEntry(relativeX, relativeY, expected);
+            }
+        }
+
+        return data;
+    }
+
+    public static float[][] extractLocalBoundedExpectedRegionFloatMatrix(ExpectedValueFunction df, Chromosome chr, int binXStart,
+                                                                         int binYStart, int numRows, int numCols) {
+
+        // numRows/numCols is just to ensure a set size in case bounds are approximate
+        // left upper corner is reference for 0,0
+        // List<Block> blocks = getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd, normalizationType, fillUnderDiagonal);
+
+        float[][] data = new float[numRows][numCols];
+        for (int relativeX = 0; relativeX < numRows; relativeX++) {
+            for (int relativeY = 0; relativeY < numRows; relativeY++) {
+                int dist = Math.abs((binXStart - binYStart) + (relativeX - relativeY));
+                double expected = df.getExpectedValue(chr.getIndex(), dist);
+                data[relativeX][relativeY] += expected;
+            }
+        }
+
+        return data;
+    }
+
     public static ListOfDoubleArrays extractChromosomeExpectedVector(Dataset ds, int index, HiCZoom zoom,
                                                                      NormalizationType normalization, boolean getCorrectedVersion) {
         ExpectedValueFunction expectedValueFunction = ds.getExpectedValues(zoom, normalization, getCorrectedVersion);

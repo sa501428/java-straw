@@ -1198,4 +1198,34 @@ public class MatrixTools {
 
         return importantDerivative;
     }
+
+    public static RealMatrix normedCopy(RealMatrix original, RealMatrix v1, RealMatrix v2, int n) {
+        RealMatrix matrix = new Array2DRowRealMatrix(n, n);
+        for (int r = 0; r < n; r++) {
+            for (int c = 0; c < n; c++) {
+                double normVal = v1.getEntry(r, 0) * v2.getEntry(c, 0);
+                if (normVal > 0) {
+                    matrix.setEntry(r, c, original.getEntry(r, c) / normVal);
+                } else {
+                    matrix.setEntry(r, c, 0);
+                }
+            }
+        }
+        return matrix;
+    }
+
+    public static float[][] normedCopyFloats(float[][] original, float[] v1, float[] v2, int n) {
+        float[][] matrix = new float[n][n];
+        for (int r = 0; r < n; r++) {
+            for (int c = 0; c < n; c++) {
+                double normVal = v1[r] * v2[c];
+                if (normVal > 0) {
+                    matrix[r][c] = (float) (original[r][c] / normVal);
+                } else {
+                    matrix[r][c] = 0;
+                }
+            }
+        }
+        return matrix;
+    }
 }

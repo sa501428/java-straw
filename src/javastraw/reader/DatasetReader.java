@@ -57,8 +57,6 @@ public interface DatasetReader {
 
     String getPath();
 
-    String readStats() throws IOException;
-
     NormalizationVector getNormalizationVector(int chr1Idx, HiCZoom zoom, NormalizationType normalizationType);
 
     int getDepthBase();

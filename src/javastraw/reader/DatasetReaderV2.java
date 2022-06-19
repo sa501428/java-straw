@@ -220,30 +220,6 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
         return dataset;
     }
 
-    public String readStats() throws IOException {
-        String statsFileName = path.substring(0, path.lastIndexOf('.')) + "_stats.html";
-        String stats;
-        BufferedReader reader = null;
-        try {
-            StringBuilder builder = new StringBuilder();
-            reader = ParsingUtils.openBufferedReader(statsFileName);
-            String nextLine;
-            int count = 0; // if there is an big text file that happens to be named the same, don't read it forever
-            while ((nextLine = reader.readLine()) != null && count < 1000) {
-                builder.append(nextLine);
-                builder.append("\n");
-                count++;
-            }
-            stats = builder.toString();
-        } finally {
-            if (reader != null) {
-                reader.close();
-            }
-        }
-
-        return stats;
-    }
-
     @Override
     public NormalizationVector getNormalizationVector(int chr1Idx, HiCZoom zoom, NormalizationType normalizationType) {
         return dataset.getNormalizationVector(chr1Idx, zoom, normalizationType);

@@ -555,7 +555,7 @@ public class HiCFileTools {
                                                      boolean isIntra, boolean fillUnderDiagonal, float pseudocount,
                                                      float invalidReplacement, boolean getCorrectedVersion) throws IOException {
 
-        ExpectedValueFunction df = ds.getExpectedValuesOrExit(zd.getZoom(), norm, chromosome, true, getCorrectedVersion);
+        ExpectedValueFunction df = ds.getExpectedValuesOrExit(zd.getZoom(), norm, true, getCorrectedVersion);
 
         int maxBin = (int) (chromosome.getLength() / resolution + 1);
 

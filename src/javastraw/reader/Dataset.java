@@ -213,11 +213,10 @@ public class Dataset {
         return expectedValueFunctionMap.get(key);
     }
 
-    public ExpectedValueFunction getExpectedValuesOrExit(HiCZoom zoom, NormalizationType type, Chromosome chromosome,
-                                                         boolean isIntra, boolean getCorrectedVersion) {
+    public ExpectedValueFunction getExpectedValuesOrExit(HiCZoom zoom, NormalizationType type, boolean isIntra, boolean getCorrectedVersion) {
         ExpectedValueFunction df = getExpectedValues(zoom, type, getCorrectedVersion);
         if (isIntra && df == null) {
-            System.err.println("O/E data not available at " + chromosome.getName() + " " + zoom + " " + type);
+            System.err.println("O/E data not available for " + zoom + " " + type);
             System.exit(14);
         }
         return df;
@@ -264,16 +263,8 @@ public class Dataset {
     }
 
     public String getStatistics() {
-        String stats = null;
-        if (attributes != null) stats = attributes.get(STATISTICS);
-        if (stats == null) {
-            try {
-                attributes.put(STATISTICS, reader.readStats());
-            } catch (IOException error) {
-                return null;
-            }
-        }
-        return attributes.get(STATISTICS);
+        if (attributes != null) return attributes.get(STATISTICS);
+        return null;
     }
 
     public String getGraphs() {

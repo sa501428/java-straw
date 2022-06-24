@@ -31,7 +31,7 @@ To set up in IDEA, have the Java SDK installed then you'll point to it (IntelliJ
 of thing).
 
 * Then go to `VCS` -> `checkout from version control`.
-* You'll need to do is be sure `*.sizes` is included as a file to be copied over to the class files. Set this up via
+* You'll need to be sure `*.sizes` is included as a file to be copied over to the class files. Set this up via
   IntelliJ `Preferences` -> `Compiler`. Add `?*.sizes` to the list of `Resource Patterns`.
 * One last note: be sure to `Commit and Push` when you commit files, it's hidden in the dropdown menu button in the
   commit window.

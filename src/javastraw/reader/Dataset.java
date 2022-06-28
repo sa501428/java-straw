@@ -24,7 +24,6 @@
 
 package javastraw.reader;
 
-import com.google.common.primitives.Ints;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.expected.ExpectedValueFunction;
@@ -32,7 +31,6 @@ import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
 import javastraw.reader.type.NormalizationType;
-import org.broad.igv.util.Pair;
 import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
@@ -126,7 +124,7 @@ public class Dataset {
         }
 
         for (Matrix matrix : matrices.values()) {
-            matrix.createDynamicResolutionMZD(new Pair<>(newRes, highRes), true);
+            matrix.createDynamicResolutionMZD(new IntPair(newRes, highRes), true);
         }
         dynamicZooms.add(new HiCZoom(HiCZoom.HiCUnit.BP, newRes));
     }
@@ -281,13 +279,21 @@ public class Dataset {
 
     public void setBpZooms(int[] bpBinSizes) {
 
-        bpZoomResolutions = Ints.asList(bpBinSizes);
+        bpZoomResolutions = asList(bpBinSizes);
 
         bpZooms = new ArrayList<>(bpBinSizes.length);
         for (int bpBinSize : bpZoomResolutions) {
             bpZooms.add(new HiCZoom(HiCZoom.HiCUnit.BP, bpBinSize));
         }
         dynamicZooms = new ArrayList<>();
+    }
+
+    private List<Integer> asList(int[] bpBinSizes) {
+        List<Integer> values = new ArrayList<>();
+        for (int bin : bpBinSizes) {
+            values.add(bin);
+        }
+        return values;
     }
 
     public List<HiCZoom> getFragZooms() {

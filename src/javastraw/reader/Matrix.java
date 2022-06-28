@@ -29,7 +29,6 @@ import javastraw.reader.basics.Chromosome;
 import javastraw.reader.mzd.DynamicMatrixZoomData;
 import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.type.HiCZoom;
-import org.broad.igv.util.Pair;
 
 import java.util.*;
 
@@ -37,7 +36,7 @@ public class Matrix {
 
     private final int chr1;
     private final int chr2;
-    private final static Set<Pair<Integer, Integer>> dynamicZoomResolutions = new HashSet<>();
+    private final static Set<IntPair> dynamicZoomResolutions = new HashSet<>();
     protected final List<MatrixZoomData> bpZoomData = new ArrayList<>();
     protected final List<MatrixZoomData> fragZoomData = new ArrayList<>();
     protected final List<MatrixZoomData> dynamicBPZoomData = new ArrayList<>();
@@ -70,7 +69,7 @@ public class Matrix {
             fragZoomData.sort(comparator);
         }
 
-        for (Pair<Integer, Integer> resPair : dynamicZoomResolutions) {
+        for (IntPair resPair : dynamicZoomResolutions) {
             try {
                 createDynamicResolutionMZD(resPair, false);
             } catch (Exception e) {
@@ -86,9 +85,9 @@ public class Matrix {
         return "" + chr1 + "_" + chr2;
     }
 
-    public void createDynamicResolutionMZD(Pair<Integer, Integer> resPair, boolean addToSet) {
-        int newRes = resPair.getFirst();
-        int highRes = resPair.getSecond();
+    public void createDynamicResolutionMZD(IntPair resPair, boolean addToSet) {
+        int newRes = resPair.a;
+        int highRes = resPair.b;
 
         MatrixZoomData highMZD = getZoomData(new HiCZoom(HiCZoom.HiCUnit.BP, highRes));
         MatrixZoomData newMZD = new DynamicMatrixZoomData(new HiCZoom(HiCZoom.HiCUnit.BP, newRes), highMZD);

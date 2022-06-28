@@ -14,7 +14,6 @@ import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;
 import org.broad.igv.util.CompressionUtils;
-import org.broad.igv.util.Pair;
 import org.broad.igv.util.stream.IGVSeekableStreamFactory;
 
 import java.io.BufferedInputStream;
@@ -48,7 +47,7 @@ public class ReaderTools {
     }
 
 
-    static LittleEndianInputStream createStreamFromSeveralBuffers(LargeIndexEntry idx, String path) throws IOException {
+    public static LittleEndianInputStream createStreamFromSeveralBuffers(LargeIndexEntry idx, String path) throws IOException {
         List<byte[]> buffer = seekAndFullyReadLargeCompressedBytes(idx, path);
         List<ByteArrayInputStream> disList = new ArrayList<>();
         for (int i = 0; i < buffer.size(); i++) {
@@ -57,7 +56,7 @@ public class ReaderTools {
         return new LittleEndianInputStream(new SequenceInputStream(Collections.enumeration(disList)));
     }
 
-    static byte[] seekAndFullyReadCompressedBytes(IndexEntry idx, String path) throws IOException {
+    public static byte[] seekAndFullyReadCompressedBytes(IndexEntry idx, String path) throws IOException {
         byte[] compressedBytes = new byte[idx.size];
         SeekableStream stream = ReaderTools.getValidStream(path, idx.position);
         stream.readFully(compressedBytes);
@@ -65,7 +64,7 @@ public class ReaderTools {
         return compressedBytes;
     }
 
-    static List<byte[]> seekAndFullyReadLargeCompressedBytes(LargeIndexEntry idx, String path) throws IOException {
+    public static List<byte[]> seekAndFullyReadLargeCompressedBytes(LargeIndexEntry idx, String path) throws IOException {
         List<byte[]> compressedBytes = new ArrayList<>();
         long counter = idx.size;
         while (counter > MAX_BYTE_READ_SIZE) {
@@ -82,10 +81,10 @@ public class ReaderTools {
         return compressedBytes;
     }
 
-    static Pair<MatrixZoomData, Long> readMatrixZoomData(Chromosome chr1, Chromosome chr2, int[] chr1Sites, int[] chr2Sites,
-                                                         long filePointer, String path, boolean useCache,
-                                                         DatasetReader reader, int specificResolution,
-                                                         boolean allowDynamicBlockIndex) throws IOException {
+    public static MatrixZoomData readMatrixZoomData(Chromosome chr1, Chromosome chr2, int[] chr1Sites, int[] chr2Sites,
+                                                    long filePointer, String path, boolean useCache,
+                                                    DatasetReader reader, int specificResolution,
+                                                    boolean allowDynamicBlockIndex, long[] storeFilePosition) throws IOException {
         SeekableStream stream = ReaderTools.getValidStream(path, filePointer);
         LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
 
@@ -135,12 +134,13 @@ public class ReaderTools {
                 reader, blockIndices, useCache, sumCounts);
 
         stream.close();
-        return new Pair<>(zd, currentFilePointer);
+        storeFilePosition[0] = currentFilePointer;
+        return zd;
     }
 
-    static long readExpectedVectorInFooter(long currentPosition,
-                                           Map<String, ExpectedValueFunction> expectedValuesMap,
-                                           NormalizationType norm, int version, String path, DatasetReader reader) throws IOException {
+    public static long readExpectedVectorInFooter(long currentPosition,
+                                                  Map<String, ExpectedValueFunction> expectedValuesMap,
+                                                  NormalizationType norm, int version, String path, DatasetReader reader) throws IOException {
         SeekableStream stream = ReaderTools.getValidStream(path, currentPosition);
         LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, 50));
         String unitString = dis.readString();
@@ -166,7 +166,7 @@ public class ReaderTools {
         return currentPosition;
     }
 
-    static long readVectorLength(LittleEndianInputStream dis, long[] nValues, int version) throws IOException {
+    public static long readVectorLength(LittleEndianInputStream dis, long[] nValues, int version) throws IOException {
         if (version > 8) {
             nValues[0] = dis.readLong();
             return 8;
@@ -176,9 +176,9 @@ public class ReaderTools {
         }
     }
 
-    static long setUpPartialVectorStreaming(long currentPosition, Map<String, ExpectedValueFunction> expectedValuesMap,
-                                            HiCZoom.HiCUnit unit, int binSize, long nValues,
-                                            NormalizationType norm, int version, String path, DatasetReader reader) throws IOException {
+    public static long setUpPartialVectorStreaming(long currentPosition, Map<String, ExpectedValueFunction> expectedValuesMap,
+                                                   HiCZoom.HiCUnit unit, int binSize, long nValues,
+                                                   NormalizationType norm, int version, String path, DatasetReader reader) throws IOException {
         long skipPosition = currentPosition;
         long expectedVectorIndexPosition = currentPosition;
         if (version > 8) {
@@ -202,7 +202,8 @@ public class ReaderTools {
         return currentPosition;
     }
 
-    static long readWholeNormalizationVector(long currentPosition, LittleEndianInputStream dis,
+    /*
+    public long readWholeNormalizationVector(long currentPosition, LittleEndianInputStream dis,
                                              Map<String, ExpectedValueFunction> expectedValuesMap,
                                              HiCZoom.HiCUnit unit, int binSize, long nValues, NormalizationType norm,
                                              int version) throws IOException {
@@ -216,7 +217,8 @@ public class ReaderTools {
         int nNormalizationFactors = dis.readInt();
         currentPosition += 4;
 
-        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, currentPosition, null);
+        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version,
+                getValidStream(path, currentPosition));
         currentPosition += hmReader.getOffset();
 
         String key = ExpectedValueFunction.getKey(unit, binSize, norm);
@@ -224,27 +226,28 @@ public class ReaderTools {
         expectedValuesMap.put(key, df);
         return currentPosition;
     }
+    */
 
-    static long readVectorOfFloats(LittleEndianInputStream dis, long nValues,
-                                   ListOfDoubleArrays values) throws IOException {
+    public static long readVectorOfFloats(LittleEndianInputStream dis, long nValues,
+                                          ListOfDoubleArrays values) throws IOException {
         for (long j = 0; j < nValues; j++) {
             values.set(j, dis.readFloat());
         }
         return 4 * nValues;
     }
 
-    static long readVectorOfDoubles(LittleEndianInputStream dis, long nValues,
-                                    ListOfDoubleArrays values) throws IOException {
+    public static long readVectorOfDoubles(LittleEndianInputStream dis, long nValues,
+                                           ListOfDoubleArrays values) throws IOException {
         for (long j = 0; j < nValues; j++) {
             values.set(j, dis.readDouble());
         }
         return 8 * nValues;
     }
 
-    static NormalizationVector createNormalizationVector(NormalizationType type, int chrIdx,
-                                                         HiCZoom.HiCUnit unit, int binSize,
-                                                         boolean useVCForVCSQRT, LittleEndianInputStream dis,
-                                                         long nValues, int version) throws IOException {
+    public static NormalizationVector createNormalizationVector(NormalizationType type, int chrIdx,
+                                                                HiCZoom.HiCUnit unit, int binSize,
+                                                                boolean useVCForVCSQRT, LittleEndianInputStream dis,
+                                                                long nValues, int version) throws IOException {
         ListOfDoubleArrays values = new ListOfDoubleArrays(nValues);
         boolean allNaN = true;
         for (long i = 0; i < nValues; i++) {
@@ -262,7 +265,7 @@ public class ReaderTools {
         else return new NormalizationVector(type, chrIdx, unit, binSize, values);
     }
 
-    static void populateContactRecordsColShort(LittleEndianInputStream dis, List<ContactRecord> records, int binXOffset, boolean useShort, int binY) throws IOException {
+    public static void populateContactRecordsColShort(LittleEndianInputStream dis, List<ContactRecord> records, int binXOffset, boolean useShort, int binY) throws IOException {
         int colCount = dis.readShort();
         for (int j = 0; j < colCount; j++) {
             int binX = binXOffset + dis.readShort();
@@ -271,7 +274,7 @@ public class ReaderTools {
         }
     }
 
-    static void populateContactRecordsColInt(LittleEndianInputStream dis, List<ContactRecord> records, int binXOffset, boolean useShort, int binY) throws IOException {
+    public static void populateContactRecordsColInt(LittleEndianInputStream dis, List<ContactRecord> records, int binXOffset, boolean useShort, int binY) throws IOException {
         int colCount = dis.readInt();
         for (int j = 0; j < colCount; j++) {
             int binX = binXOffset + dis.readInt();
@@ -280,12 +283,12 @@ public class ReaderTools {
         }
     }
 
-    static byte[] decompress(byte[] compressedBytes) {
+    public static byte[] decompress(byte[] compressedBytes) {
         CompressionUtils compressionUtils = new CompressionUtils();
         return compressionUtils.decompress(compressedBytes);
     }
 
-    static int[] readSites(long position, int nSites, String path) throws IOException {
+    public static int[] readSites(long position, int nSites, String path) throws IOException {
         IndexEntry idx = new IndexEntry(position, 4 + nSites * 4);
         byte[] buffer = ReaderTools.seekAndFullyReadCompressedBytes(idx, path);
         LittleEndianInputStream les = new LittleEndianInputStream(new ByteArrayInputStream(buffer));

@@ -42,9 +42,7 @@ import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
 import javastraw.reader.type.NormalizationType;
-import org.broad.igv.Globals;
 import org.broad.igv.exceptions.HttpResponseException;
-import org.broad.igv.util.Pair;
 import org.broad.igv.util.ParsingUtils;
 
 import java.io.*;
@@ -79,10 +77,11 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
     @Override
     public Dataset read() throws IOException {
-
+        //long s1 = System.nanoTime();
         try {
             SeekableStream stream = ReaderTools.getValidStream(path);
             long position = 0L;
+            //long s1b = System.nanoTime();
 
             // Read the header
             LittleEndianInputStream dis = new LittleEndianInputStream(new BufferedInputStream(stream, StrawGlobals.bufferSize));
@@ -96,7 +95,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             version = dis.readInt();
             position += 4;
 
-            System.out.println("HiC file version: " + version);
+            //System.out.println("HiC file version: " + version);
             masterIndexPos = dis.readLong();
 
             position += 8;
@@ -110,7 +109,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                 nviHeaderPosition = position;
                 long nvi = dis.readLong();
                 long nviSize = dis.readLong();
-                System.err.println(nvi + " " + nviSize);
+                //System.err.println(nvi + " " + nviSize);
                 position += 16;
             }
 
@@ -191,7 +190,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
                 String firstChrName = null;
                 for (int i = 0; i < nchrs; i++) {
                     String chr = chromosomes.get(i).getName();
-                    if (!chr.equals(Globals.CHR_ALL)) {
+                    if (!chr.equals(StrawGlobals.CHR_ALL)) {
                         firstChrName = chr;
                     }
                     byte[] buffer = new byte[4];
@@ -212,6 +211,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             readFooter(masterIndexPos);
 
             stream.close();
+            //System.out.println("TIME : "+((s1b - s1) * 1e-9) +"\t"+((s2 - s1b) * 1e-9));
         } catch (IOException e) {
             System.err.println("Error reading dataset : " + e.getLocalizedMessage());
             e.printStackTrace();
@@ -272,10 +272,9 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
     }
 
-    private String readGraphs(String graphFileName) throws IOException {
+    private String readGraphs(String graphFileName) {
         String graphs;
         try (BufferedReader reader = ParsingUtils.openBufferedReader(graphFileName)) {
-            if (reader == null) return null;
             StringBuilder builder = new StringBuilder();
             String nextLine;
             while ((nextLine = reader.readLine()) != null) {
@@ -467,10 +466,12 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
 
         for (int i = 0; i < nResolutions; i++) {
             try {
-                Pair<MatrixZoomData, Long> result = ReaderTools.readMatrixZoomData(chr1, chr2, chr1Sites, chr2Sites,
-                        currentFilePosition, path, useCache, this, specificResolution, allowDynamicBlockIndex);
-                zdList.add(result.getFirst());
-                currentFilePosition = result.getSecond();
+                long[] storeFilePosition = new long[1];
+                MatrixZoomData zd = ReaderTools.readMatrixZoomData(chr1, chr2, chr1Sites, chr2Sites,
+                        currentFilePosition, path, useCache, this, specificResolution, allowDynamicBlockIndex,
+                        storeFilePosition);
+                zdList.add(zd);
+                currentFilePosition = storeFilePosition[0];
             } catch (Exception ee) {
                 System.err.println("Weird error happened with trying to read MZD at currentFilePosition: " + currentFilePosition);
                 ee.printStackTrace();

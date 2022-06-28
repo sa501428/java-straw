@@ -55,8 +55,7 @@ public class HiCFileTools {
         }
 
         try {
-            DatasetReader reader = null;
-            reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader, useDynamicBlockIndex);
+            DatasetReader reader = new DatasetReaderV2(file, useCache, useDynamicBlockIndex);
             dataset = reader.read();
             verifySupportedHiCFileVersion(reader.getVersion());
         } catch (Exception e) {

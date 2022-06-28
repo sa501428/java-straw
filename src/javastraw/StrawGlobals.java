@@ -25,7 +25,7 @@
 package javastraw;
 
 public class StrawGlobals {
-    public static final String versionNum = "2.17.01";
+    public static final String versionNum = "2.17.03";
     public static final int minVersion = 6;
     public static final int bufferSize = 2097152;
     public static final String CHR_ALL = "All";

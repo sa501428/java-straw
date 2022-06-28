@@ -181,21 +181,37 @@ public class Matrix {
 
     public void clearCache() {
         for (MatrixZoomData mzd : bpZoomData) {
-            try {
-                mzd.clearCache();
-            } catch (Exception e) {
+            tryToClear(mzd);
+        }
+        for (MatrixZoomData mzd : fragZoomData) {
+            tryToClear(mzd);
+        }
+        for (MatrixZoomData mzd : dynamicBPZoomData) {
+            tryToClear(mzd);
+        }
+    }
+
+    private void tryToClear(MatrixZoomData mzd) {
+        try {
+            mzd.clearCache();
+        } catch (Exception e) {
+        }
+    }
+
+    public void clearCacheForZoom(HiCZoom zoom) {
+        for (MatrixZoomData mzd : bpZoomData) {
+            if (mzd.getZoom().getBinSize() == zoom.getBinSize()) {
+                tryToClear(mzd);
             }
         }
         for (MatrixZoomData mzd : fragZoomData) {
-            try {
-                mzd.clearCache();
-            } catch (Exception e) {
+            if (mzd.getZoom().getBinSize() == zoom.getBinSize()) {
+                tryToClear(mzd);
             }
         }
         for (MatrixZoomData mzd : dynamicBPZoomData) {
-            try {
-                mzd.clearCache();
-            } catch (Exception e) {
+            if (mzd.getZoom().getBinSize() == zoom.getBinSize()) {
+                tryToClear(mzd);
             }
         }
     }

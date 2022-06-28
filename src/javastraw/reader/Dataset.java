@@ -84,6 +84,17 @@ public class Dataset {
         matrices.clear();
     }
 
+    public void clearInterCacheForRes(HiCZoom zoom) {
+        for (Matrix matrix : matrices.values()) {
+            if (matrix == null) continue;
+            if (matrix.isIntra()) continue;
+            try {
+                matrix.clearCacheForZoom(zoom);
+            } catch (Exception e) {
+            }
+        }
+    }
+
     public Matrix getMatrix(Chromosome chr1, Chromosome chr2) {
         return getMatrix(chr1, chr2, -1);
     }

@@ -37,6 +37,7 @@ import javastraw.reader.block.LargeIndexEntry;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.expected.ExpectedValueFunction;
 import javastraw.reader.mzd.BlockLoader;
+import javastraw.reader.mzd.Matrix;
 import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;

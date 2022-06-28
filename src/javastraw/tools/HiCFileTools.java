@@ -25,13 +25,17 @@
 package javastraw.tools;
 
 import javastraw.StrawGlobals;
-import javastraw.reader.*;
+import javastraw.reader.Dataset;
+import javastraw.reader.DatasetReader;
+import javastraw.reader.DatasetReaderFactory;
+import javastraw.reader.DatasetReaderV2;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.block.Block;
 import javastraw.reader.block.ContactRecord;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
 import javastraw.reader.expected.ExpectedValueFunction;
+import javastraw.reader.mzd.Matrix;
 import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;

@@ -27,6 +27,7 @@ package javastraw.reader;
 import javastraw.reader.block.Block;
 import javastraw.reader.block.IndexEntry;
 import javastraw.reader.datastructures.ListOfDoubleArrays;
+import javastraw.reader.mzd.Matrix;
 import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationType;

@@ -27,6 +27,7 @@ package javastraw.reader;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.expected.ExpectedValueFunction;
+import javastraw.reader.mzd.Matrix;
 import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;

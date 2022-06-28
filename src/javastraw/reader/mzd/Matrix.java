@@ -23,11 +23,10 @@
  */
 
 
-package javastraw.reader;
+package javastraw.reader.mzd;
 
+import javastraw.reader.IntPair;
 import javastraw.reader.basics.Chromosome;
-import javastraw.reader.mzd.DynamicMatrixZoomData;
-import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.type.HiCZoom;
 
 import java.util.*;
@@ -180,39 +179,42 @@ public class Matrix {
     }
 
     public void clearCache() {
-        for (MatrixZoomData mzd : bpZoomData) {
+        clearOut(bpZoomData);
+        clearOut(fragZoomData);
+        clearOut(dynamicBPZoomData);
+    }
+
+    public void clearCacheForZoom(HiCZoom zoom) {
+        clearSpecificResolution(bpZoomData, zoom);
+        clearSpecificResolution(fragZoomData, zoom);
+        clearSpecificResolution(dynamicBPZoomData, zoom);
+    }
+
+    private void clearOut(List<MatrixZoomData> zoomData) {
+        for (MatrixZoomData mzd : zoomData) {
             tryToClear(mzd);
         }
-        for (MatrixZoomData mzd : fragZoomData) {
+        zoomData.clear();
+    }
+
+    private void clearSpecificResolution(List<MatrixZoomData> zoomData, HiCZoom zoom) {
+        List<MatrixZoomData> toDelete = new ArrayList<>();
+        for (MatrixZoomData mzd : zoomData) {
+            if (mzd.getZoom().getBinSize() == zoom.getBinSize()) {
+                toDelete.add(mzd);
+            }
+        }
+        zoomData.removeAll(toDelete);
+        for (MatrixZoomData mzd : toDelete) {
             tryToClear(mzd);
         }
-        for (MatrixZoomData mzd : dynamicBPZoomData) {
-            tryToClear(mzd);
-        }
+        toDelete.clear();
     }
 
     private void tryToClear(MatrixZoomData mzd) {
         try {
             mzd.clearCache();
         } catch (Exception e) {
-        }
-    }
-
-    public void clearCacheForZoom(HiCZoom zoom) {
-        for (MatrixZoomData mzd : bpZoomData) {
-            if (mzd.getZoom().getBinSize() == zoom.getBinSize()) {
-                tryToClear(mzd);
-            }
-        }
-        for (MatrixZoomData mzd : fragZoomData) {
-            if (mzd.getZoom().getBinSize() == zoom.getBinSize()) {
-                tryToClear(mzd);
-            }
-        }
-        for (MatrixZoomData mzd : dynamicBPZoomData) {
-            if (mzd.getZoom().getBinSize() == zoom.getBinSize()) {
-                tryToClear(mzd);
-            }
         }
     }
 }

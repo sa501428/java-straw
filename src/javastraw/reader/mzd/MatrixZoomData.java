@@ -244,7 +244,7 @@ public class MatrixZoomData {
         return (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
     }
 
-    public void clearCache() {
+    void clearCache() {
         blockCache.clear();
         pearsonsMap.clear();
         eigenvectorMap.clear();

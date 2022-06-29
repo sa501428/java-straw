@@ -79,7 +79,8 @@ public class ContactRecordIterator implements Iterator<ContactRecord> {
     @Override
     public boolean hasNext() {
         if (blockNumbers == null || blockNumbers.size() == 0) {
-            System.err.println("No blocks available for " + zdKey + ". Verify dynamic blocks not being used.");
+            System.err.println("ERROR: No blocks available for " + zdKey + ". " +
+                    "Verify dynamic blocks not being used or that cache has not been cleared early.");
             return false;
         }
 

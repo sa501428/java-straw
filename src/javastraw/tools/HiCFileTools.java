@@ -63,7 +63,7 @@ public class HiCFileTools {
             dataset = reader.read();
             verifySupportedHiCFileVersion(reader.getVersion());
         } catch (Exception e) {
-            System.err.println("Could not read hic file: " + e.getMessage());
+            System.err.println("Could not read hic file (" + file + "): " + e.getLocalizedMessage());
             System.exit(34);
             //e.printStackTrace();
         }
@@ -104,7 +104,7 @@ public class HiCFileTools {
             reader = getDatasetVerifyMagicString(allowPrinting, useCache, file, reader, useDynamicBlockIndex);
 
         } catch (Exception e) {
-            System.err.println("Could not read hic file: " + e.getMessage());
+            System.err.println("Could not read hic file (" + file + "): " + e.getLocalizedMessage());
             System.exit(34);
             //e.printStackTrace();
         }

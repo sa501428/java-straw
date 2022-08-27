@@ -1,8 +1,24 @@
 package javastraw.expected;
 
 import javastraw.reader.block.ContactRecord;
+import javastraw.reader.mzd.MatrixZoomData;
+import javastraw.reader.type.NormalizationType;
+
+import java.util.Iterator;
 
 public abstract class ExpectedModel {
+
+    public static int getDist(ContactRecord record) {
+        return Math.abs(record.getBinX() - record.getBinY());
+    }
+
+    public static Iterator<ContactRecord> getIterator(MatrixZoomData zd, NormalizationType norm) {
+        if (norm.getLabel().equalsIgnoreCase("none")) {
+            return zd.getDirectIterator();
+        } else {
+            return zd.getNormalizedIterator(norm);
+        }
+    }
 
     public static float getP(double obs, double expected, double superDiagonal) {
         // P = (O - E)/(SD - E)

@@ -405,6 +405,7 @@ public class HiCFileTools {
         }
 
         // force cleanup
+        blocks.clear();
         blocks = null;
         //System.gc();
 

@@ -12,8 +12,12 @@ public class ZScoreArray {
         this.stdDev = stdDev;
     }
 
-    public float getZscore(int index, double value) {
-        return (float) ((value - mean[index]) / stdDev[index]);
+    public double getZscore(int index, double value) {
+        return (value - mean[index]) / stdDev[index];
+    }
+
+    public double getValForZscore(int index, double z) {
+        return mean[index] + (z * stdDev[index]);
     }
 
     public void print() {

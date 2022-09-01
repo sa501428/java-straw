@@ -10,7 +10,11 @@ public class Zscore {
         this.stdDev = stdDev;
     }
 
-    public float getZscore(double value) {
-        return (float) ((value - mean) / stdDev);
+    public double getZscore(double value) {
+        return (value - mean) / stdDev;
+    }
+
+    public double getValForZscore(double z) {
+        return mean + (z * stdDev);
     }
 }

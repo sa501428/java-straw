@@ -191,13 +191,15 @@ public class ReaderTools {
         int nNormalizationFactors = ReaderTools.readIntFromBytes(stream);
         currentPosition = skipPosition + 4;
 
-        NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, currentPosition, path);
-        currentPosition += hmReader.getOffset();
+        if (nNormalizationFactors > 0) {
+            NormFactorMapReader hmReader = new NormFactorMapReader(nNormalizationFactors, version, currentPosition, path);
+            currentPosition += hmReader.getOffset();
+            ExpectedValueFunction df = new ExpectedValueFunctionImpl(norm, unit, binSize, nValues,
+                    expectedVectorIndexPosition, hmReader.getNormFactors(), reader);
+            String key = ExpectedValueFunction.getKey(unit, binSize, norm);
+            expectedValuesMap.put(key, df);
+        }
 
-        ExpectedValueFunction df = new ExpectedValueFunctionImpl(norm, unit, binSize, nValues,
-                expectedVectorIndexPosition, hmReader.getNormFactors(), reader);
-        String key = ExpectedValueFunction.getKey(unit, binSize, norm);
-        expectedValuesMap.put(key, df);
         stream.close();
         return currentPosition;
     }

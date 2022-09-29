@@ -63,9 +63,5 @@ public class Chromosome {
     public int hashCode() {
         return Objects.hash(this.index, this.length);
     }
-
-    public org.broad.igv.feature.Chromosome toIGVChromosome() {
-        return new org.broad.igv.feature.Chromosome(index, name, (int) length); // todo assumed for IGV
-    }
 }
 

@@ -24,11 +24,9 @@
 
 package javastraw.feature2D;
 
+import javastraw.igv.ParsingUtils;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
-import org.broad.igv.Globals;
-import org.broad.igv.ui.color.ColorUtilities;
-import org.broad.igv.util.ParsingUtils;
 
 import java.awt.*;
 import java.io.BufferedReader;
@@ -36,12 +34,11 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
-/**
- * Created by muhammadsaadshamim on 6/1/15.
- */
 public class Feature2DParser {
 
+    final static public Pattern tabPattern = Pattern.compile("\t");
     private static final int BUFFER_SIZE = 2097152;
 
     public static Feature2DList loadFeatures(String path, ChromosomeHandler handler, boolean loadAttributes,
@@ -119,7 +116,7 @@ public class Feature2DParser {
             while ((nextLine = br.readLine()) != null) {
                 lineNum++;
                 if (nextLine.startsWith("#")) continue;
-                String[] tokens = Globals.tabPattern.split(nextLine);
+                String[] tokens = tabPattern.split(nextLine);
                 if (tokens.length > headers.length) {
                     String text = "Improperly formatted file: \nLine " + lineNum + " has " + tokens.length + " entries" +
                             " while header has " + headers.length;
@@ -149,7 +146,7 @@ public class Feature2DParser {
      * @return Appropriate header
      */
     private static String[] getHeaders(String line) {
-        String[] tmpHeaders = Globals.tabPattern.split(line.replaceAll("#", "").trim());
+        String[] tmpHeaders = tabPattern.split(line.replaceAll("#", "").trim());
         String[] headers = new String[tmpHeaders.length];
 
         for (int i = 0; i < tmpHeaders.length; i++) {
@@ -306,7 +303,7 @@ public class Feature2DParser {
                 throw new IOException(text);
             }
 
-            Color c = tokens.length > 10 ? ColorUtilities.stringToColor(tokens[10].trim()) : Color.black;
+            Color c = tokens.length > 10 ? stringToColor(tokens[10].trim()) : Color.black;
             Map<String, String> attrs = parseAttributes(loadAttributes, 11, headers, tokens);
 
             addToList(chr1Name, chr2Name, handler, nextLine, newList, useFeature2DWithMotif, featureType,
@@ -335,7 +332,7 @@ public class Feature2DParser {
                 throw new IOException(text);
             }
 
-            Color c = tokens.length > 6 ? ColorUtilities.stringToColor(tokens[6].trim()) : Color.black;
+            Color c = tokens.length > 6 ? stringToColor(tokens[6].trim()) : Color.black;
             Map<String, String> attrs = parseAttributes(loadAttributes, 7, headers, tokens);
 
             addToList(chr1Name, chr2Name, handler, nextLine, newList, useFeature2DWithMotif, featureType,
@@ -363,10 +360,18 @@ public class Feature2DParser {
                 throw new IOException(text);
             }
 
-            Color c = tokens.length > 4 ? ColorUtilities.stringToColor(tokens[4].trim()) : Color.black;
+            Color c = tokens.length > 4 ? stringToColor(tokens[4].trim()) : Color.black;
             Map<String, String> attrs = parseAttributes(loadAttributes, 5, headers, tokens);
             addToList(chr1Name, chr2Name, handler, nextLine, newList, false, featureType,
                     start1, end1, start2, end2, c, attrs);
+        }
+
+        private Color stringToColor(String string) {
+            String[] rgb = string.split(",");
+            int red = Integer.parseInt(rgb[0]);
+            int green = Integer.parseInt(rgb[1]);
+            int blue = Integer.parseInt(rgb[2]);
+            return new Color(red, green, blue);
         }
     }
 }

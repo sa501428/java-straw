@@ -15,7 +15,7 @@ import java.util.Iterator;
 import java.util.List;
 
 public class AnnotatedExample {
-    public void run() {
+    public static void main(String[] args) {
         // do you want to cache portions of the file?
         // this uses more RAM, but if you want to repeatedly
         // query nearby regions, it can improve speed by a lot
@@ -65,6 +65,7 @@ public class AnnotatedExample {
                 if (counts > 0) { // will skip NaNs
 
                     // do task
+                    System.out.println(genomeX + " " + genomeY + " " + counts);
 
                     // the iterator only iterates above the diagonal
                     // to also fill in data below the diagonal, flip it
@@ -72,6 +73,11 @@ public class AnnotatedExample {
                         binX = record.getBinY();
                         binY = record.getBinX();
                         counts = record.getCounts();
+
+                        genomeX = binX * resolution;
+                        genomeY = binY * resolution;
+
+                        System.out.println(genomeX + " " + genomeY + " " + counts);
 
                         // do task
                     }

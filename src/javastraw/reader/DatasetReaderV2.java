@@ -28,6 +28,7 @@ package javastraw.reader;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.tribble.util.LittleEndianInputStream;
 import javastraw.StrawGlobals;
+import javastraw.igv.ParsingUtils;
 import javastraw.reader.basics.Chromosome;
 import javastraw.reader.basics.ChromosomeHandler;
 import javastraw.reader.block.Block;
@@ -43,8 +44,6 @@ import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
 import javastraw.reader.type.NormalizationType;
-import org.broad.igv.exceptions.HttpResponseException;
-import org.broad.igv.util.ParsingUtils;
 
 import java.io.*;
 import java.util.*;
@@ -332,7 +331,7 @@ public class DatasetReaderV2 extends AbstractDatasetReader {
             try {
                 nNormExpectedValueVectors = dis.readInt();
                 currentPosition += 4;
-            } catch (EOFException | HttpResponseException e) {
+            } catch (Exception e) {
                 System.err.println("No normalization vectors");
                 return;
             }

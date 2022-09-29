@@ -27,7 +27,6 @@ package javastraw.reader;
 import htsjdk.samtools.seekablestream.SeekableHTTPStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
 import htsjdk.tribble.util.LittleEndianInputStream;
-import org.broad.igv.ui.util.MessageUtils;
 
 import java.io.BufferedInputStream;
 import java.io.FileInputStream;
@@ -65,7 +64,8 @@ public class DatasetReaderFactory {
             try {
                 dis = new LittleEndianInputStream(new FileInputStream(path));
             } catch (Exception e2) {
-                MessageUtils.showErrorMessage("File could not be found\n(" + path + ")", e2);
+                System.out.println("File could not be found\n(" + path + ")");
+                System.out.println(e2.getLocalizedMessage());
             }
         } finally {
             if (stream != null) stream.close();

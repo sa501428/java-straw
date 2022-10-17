@@ -4,7 +4,6 @@ import javastraw.reader.basics.Chromosome;
 import javastraw.reader.block.ContactRecord;
 import javastraw.reader.mzd.MatrixZoomData;
 import javastraw.reader.type.NormalizationType;
-import org.apache.commons.math3.analysis.interpolation.SplineInterpolator;
 import org.apache.commons.math3.analysis.polynomials.PolynomialSplineFunction;
 
 import java.util.Iterator;
@@ -34,10 +33,11 @@ public class LogExpectedZscoreSpline extends ExpectedModel {
         double[] avgExpected = values.getMean();
         double[] avgExpectedStds = values.getStdDev();
         double[] avgDistances = distances.getMean();
-        maxDist[0] = (int) Math.expm1(avgDistances[avgDistances.length - 1]);
+        maxDist[0] = Math.max(maxDist[0], (int) Math.expm1(max(avgDistances)));
 
-        return new PolynomialSplineFunction[]{new SplineInterpolator().interpolate(avgDistances, avgExpected),
-                new SplineInterpolator().interpolate(avgDistances, avgExpectedStds)};
+        PolynomialSplineFunction p1 = InterpUtils.cleanInterp(avgDistances, avgExpected);
+        PolynomialSplineFunction p2 = InterpUtils.cleanInterp(avgDistances, avgExpectedStds);
+        return new PolynomialSplineFunction[]{p1, p2};
     }
 
     private void populateWithCounts(MatrixZoomData zd, NormalizationType norm, WelfordArray values,
@@ -48,7 +48,7 @@ public class LogExpectedZscoreSpline extends ExpectedModel {
             int dist = getDist(record);
             if (dist == 0) {
                 values.addValue(0, logp1(record.getCounts()));
-                distances.addValue(0, logp1(dist));
+                distances.addValue(0, 0); // logp1(dist)
             } else if (dist < maxBin) {
                 maxDist[0] = Math.max(maxDist[0], dist);
                 values.addValue(logp1i(dist) + 1, logp1(record.getCounts()));
@@ -76,5 +76,13 @@ public class LogExpectedZscoreSpline extends ExpectedModel {
     @Override
     public double getNearDiagonalSignal() {
         return nearDiagonalSignal;
+    }
+
+    private double max(double[] array) {
+        double maxVal = array[0];
+        for (double val : array) {
+            maxVal = Math.max(maxVal, val);
+        }
+        return maxVal;
     }
 }

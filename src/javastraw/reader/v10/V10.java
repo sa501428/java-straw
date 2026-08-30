@@ -1,10 +1,14 @@
 package javastraw.reader.v10;
 
+import java.math.BigInteger;
+
 /**
  * Enumerations, limits and checked arithmetic for the V10 wire format.
  * See hic-format/HiCFormatV10.md Section A.
  */
 public final class V10 {
+
+    public static final BigInteger UINT64_MAX = BigInteger.ONE.shiftLeft(64).subtract(BigInteger.ONE);
 
     public static final int VERSION = 10;
 
@@ -82,6 +86,18 @@ public final class V10 {
     public static long unsigned32(long value) {
         require(value >= 0 && value <= 0xFFFFFFFFL, "value exceeds uint32");
         return value;
+    }
+
+    /** Convert raw two's-complement bits into an exact uint64 value. */
+    public static BigInteger unsignedLong(long bits) {
+        BigInteger value = BigInteger.valueOf(bits & Long.MAX_VALUE);
+        return bits < 0 ? value.setBit(63) : value;
+    }
+
+    public static BigInteger addUnsigned(BigInteger a, long unsignedBits) {
+        BigInteger result = a.add(unsignedLong(unsignedBits));
+        require(result.signum() >= 0 && result.bitLength() <= 64, "uint64 count overflow");
+        return result;
     }
 
     /**

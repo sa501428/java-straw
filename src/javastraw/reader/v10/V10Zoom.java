@@ -1,5 +1,6 @@
 package javastraw.reader.v10;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -52,12 +53,12 @@ public class V10Zoom {
      * sum for SCORE_FLOAT32 matrices.
      */
     public double getSum() {
-        return isScore() ? Double.longBitsToDouble(sumBits) : (double) sumBits;
+        return isScore() ? Double.longBitsToDouble(sumBits) : V10.unsignedLong(sumBits).doubleValue();
     }
 
-    public long getCountSum() {
+    public BigInteger getCountSum() {
         require(!isScore(), "score matrices have no integer count sum");
-        return sumBits;
+        return V10.unsignedLong(sumBits);
     }
 
     /**

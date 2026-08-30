@@ -106,6 +106,23 @@ public class Matrix {
         return generateKey(chr1, chr2);
     }
 
+    public int getChr1Index() { return chr1; }
+
+    public int getChr2Index() { return chr2; }
+
+    /** Return a view whose X/Y axes match the chromosome order requested. */
+    public Matrix orientedTo(Chromosome first, Chromosome second) {
+        if (first == null || second == null || !generateKey(first, second).equals(getKey())) {
+            throw new IllegalArgumentException("Requested chromosomes do not match this matrix");
+        }
+        if (first.getIndex() == chr1 || chr1 == chr2) return this;
+
+        List<MatrixZoomData> oriented = new ArrayList<>();
+        for (MatrixZoomData zd : bpZoomData) oriented.add(new OrientedMatrixZoomData(zd));
+        for (MatrixZoomData zd : fragZoomData) oriented.add(new OrientedMatrixZoomData(zd));
+        return new Matrix(first.getIndex(), second.getIndex(), oriented);
+    }
+
     public MatrixZoomData getFirstZoomData() {
         if (bpZoomData != null && bpZoomData.size() > 0) {
             return getFirstZoomData(HiCZoom.HiCUnit.BP);

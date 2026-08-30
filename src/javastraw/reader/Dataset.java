@@ -119,7 +119,7 @@ public class Dataset {
             }
         }
 
-        return m;
+        return m == null ? null : m.orientedTo(chr1, chr2);
     }
 
     public void addDynamicResolution(int newRes) {

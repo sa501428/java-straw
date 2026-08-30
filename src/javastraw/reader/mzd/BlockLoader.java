@@ -28,6 +28,10 @@ public class BlockLoader {
         final Object cacheLock = new Object();
         final Set<Block> globalBlockSet = new HashSet<>();
 
+        // Every requested block may already be present in the shared cache.
+        // Executors reject a zero-sized pool, and there is no work to launch.
+        if (blockIds.isEmpty()) return;
+
         int numJobs = Math.min(blockIds.size(), 8);
         AtomicInteger index = new AtomicInteger(0);
 

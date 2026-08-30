@@ -47,6 +47,7 @@ import javastraw.reader.v10.V10RecordHandler;
 import javastraw.reader.v10.V10Zoom;
 
 import java.io.IOException;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -85,7 +86,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
                              V10MatrixZoomData sourceZD, boolean useCache, long nBins1, long nBins2) {
         super(chr1, chr2, new HiCZoom(zoom.unit == V10.UNIT_FRAG ? HiCZoom.HiCUnit.FRAG : HiCZoom.HiCUnit.BP,
                         zoom.binSize), zoom.blockBinCount, zoom.blockColumnCount, null, null, reader, null,
-                useCache, zoom.isScore() ? Double.NaN : (double) zoom.getCountSum());
+                useCache, zoom.isScore() ? Double.NaN : zoom.getCountSum().doubleValue());
         this.v10Reader = reader;
         this.v10Zoom = zoom;
         this.sourceZD = sourceZD;
@@ -454,7 +455,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
             V10.require(!Double.isNaN(accumulator.score) && !Double.isInfinite(accumulator.score),
                     "derived score overflow");
         } else {
-            accumulator.count = V10.add(accumulator.count, count);
+            accumulator.count = V10.addUnsigned(accumulator.count, count);
         }
     }
 
@@ -471,11 +472,11 @@ public class V10MatrixZoomData extends MatrixZoomData {
     }
 
     /**
-     * Counts accumulate exactly in a long; scores accumulate in binary64 and are
-     * rounded once to binary32, as Section K requires.
+     * Counts accumulate exactly as unsigned 64-bit integers; scores accumulate
+     * in binary64 and are rounded once to binary32, as Section K requires.
      */
     private static class Accumulator {
-        long count;
+        BigInteger count = BigInteger.ZERO;
         double score;
 
         ContactRecord toRecord(int binColumn, int binRow, boolean isScore) {

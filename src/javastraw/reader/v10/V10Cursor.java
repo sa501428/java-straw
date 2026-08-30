@@ -100,6 +100,17 @@ public final class V10Cursor {
      * Canonical unsigned LEB128 (Section A.2).
      */
     public long varint() {
+        long value = varintBits();
+        require(value >= 0, "ULEB128 value exceeds the signed 64-bit range supported by this API");
+        return value;
+    }
+
+    /** Read a canonical uint64 ULEB128 and return its raw long bits. */
+    public long unsignedVarintBits() {
+        return varintBits();
+    }
+
+    private long varintBits() {
         long value = 0;
         for (int i = 0; i < 10; i++) {
             int b = byteValue();
@@ -107,7 +118,6 @@ public final class V10Cursor {
             value |= (long) (b & 0x7F) << (i * 7);
             if ((b & 0x80) == 0) {
                 require(i == 0 || b != 0, "non-canonical ULEB128");
-                require(value >= 0, "ULEB128 value exceeds the signed 64-bit range supported by this API");
                 return value;
             }
         }

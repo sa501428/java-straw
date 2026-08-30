@@ -24,6 +24,8 @@
 
 package javastraw.reader.block;
 
+import java.math.BigInteger;
+
 import javastraw.reader.type.NormalizationType;
 
 import java.util.Objects;
@@ -76,8 +78,13 @@ public class ContactRecord implements Comparable<ContactRecord> {
      *
      * @see V10ContactRecord
      */
-    public long getExactCount() {
-        return (long) counts;
+    public BigInteger getExactCount() {
+        return BigInteger.valueOf((long) counts);
+    }
+
+    /** Return the same logical record with its axes exchanged. */
+    public ContactRecord transpose() {
+        return new ContactRecord(binY, binX, counts);
     }
 
     @Override

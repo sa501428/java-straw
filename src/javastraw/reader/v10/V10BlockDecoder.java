@@ -132,7 +132,7 @@ public final class V10BlockDecoder {
                     }
                 }
             } else if (valueType == V10.COUNT_UINT) {
-                require(value > 0, "sparse/bitmap count must be positive");
+                require(value != 0, "sparse/bitmap count must be positive");
             }
             if (!present) continue;
 
@@ -199,6 +199,6 @@ public final class V10BlockDecoder {
      * little-endian bytes of its f32 bit pattern (Section I.5).
      */
     private static long scalar(V10Cursor values, int valueType) {
-        return valueType == V10.SCORE_FLOAT32 ? values.word() : values.varint();
+        return valueType == V10.SCORE_FLOAT32 ? values.word() : values.unsignedVarintBits();
     }
 }

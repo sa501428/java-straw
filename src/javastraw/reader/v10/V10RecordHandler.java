@@ -11,7 +11,7 @@ public interface V10RecordHandler {
     /**
      * @param binColumn global bin column (chromosome 1 of the canonical pair)
      * @param binRow    global bin row (chromosome 2 of the canonical pair)
-     * @param count     exact contact count, meaningful when {@code isScore} is false
+     * @param count     raw uint64 bits, meaningful when {@code isScore} is false
      * @param score     exact stored score, meaningful when {@code isScore} is true
      * @param isScore   true for SCORE_FLOAT32 matrices, false for COUNT_UINT
      */

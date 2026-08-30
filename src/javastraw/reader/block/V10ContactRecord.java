@@ -24,6 +24,8 @@
 
 package javastraw.reader.block;
 
+import java.math.BigInteger;
+
 /**
  * A contact record that also carries its exact integer count.
  * <p>
@@ -32,31 +34,37 @@ package javastraw.reader.block;
  * longer be represented exactly by {@link ContactRecord}'s float. Records with
  * such counts are emitted as this subclass, which keeps the float value for
  * every existing caller while exposing the exact count through
- * {@link #getExactCount()}. Counts that a float represents exactly still use
- * the plain {@link ContactRecord}, so nothing changes for ordinary data.
+ * {@link #getExactCount()}. Every V10 integer record uses this representation
+ * so the exact value is preserved consistently through all code paths.
  */
 public class V10ContactRecord extends ContactRecord {
 
-    private final long exactCount;
+    private final BigInteger exactCount;
 
-    private V10ContactRecord(int binX, int binY, long exactCount) {
-        super(binX, binY, (float) exactCount);
+    private V10ContactRecord(int binX, int binY, BigInteger exactCount) {
+        super(binX, binY, exactCount.floatValue());
         this.exactCount = exactCount;
     }
 
-    /**
-     * Returns a plain {@link ContactRecord} when the count is exactly
-     * representable as a float, and an exact-count record otherwise.
-     */
-    public static ContactRecord create(int binX, int binY, long count) {
-        if ((long) (float) count == count) {
-            return new ContactRecord(binX, binY, (float) count);
+    /** Create a record from the raw two's-complement bits of a V10 uint64. */
+    public static ContactRecord create(int binX, int binY, long unsignedBits) {
+        return create(binX, binY, javastraw.reader.v10.V10.unsignedLong(unsignedBits));
+    }
+
+    public static ContactRecord create(int binX, int binY, BigInteger count) {
+        if (count.signum() <= 0 || count.bitLength() > 64) {
+            throw new IllegalArgumentException("V10 count is outside uint64");
         }
         return new V10ContactRecord(binX, binY, count);
     }
 
     @Override
-    public long getExactCount() {
+    public BigInteger getExactCount() {
         return exactCount;
+    }
+
+    @Override
+    public ContactRecord transpose() {
+        return new V10ContactRecord(getBinY(), getBinX(), exactCount);
     }
 }

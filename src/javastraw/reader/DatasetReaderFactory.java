@@ -36,6 +36,39 @@ import java.net.URL;
 
 public class DatasetReaderFactory {
 
+    /**
+     * Returns the reader matching the file's declared version: {@link DatasetReaderV10}
+     * for version 10 files, {@link DatasetReaderV2} for versions 6 through 9.
+     * Prefer this over {@link #getReaderForFile} unless a V2 reader is required.
+     */
+    public static DatasetReader getReader(String file, boolean useCache, boolean useDynamicBlockIndex)
+            throws IOException {
+        String magicString = getMagicString(file);
+        if (magicString == null || !magicString.equals("HIC")) {
+            System.err.println("This version is deprecated and is no longer supported.");
+            return null;
+        }
+        if (getVersion(file) == javastraw.reader.v10.V10.VERSION) {
+            return new DatasetReaderV10(file, useCache);
+        }
+        return new DatasetReaderV2(file, useCache, useDynamicBlockIndex);
+    }
+
+    /**
+     * The version declared in the four bytes following the magic string.
+     */
+    public static int getVersion(String path) throws IOException {
+        SeekableStream stream = ReaderTools.getValidStream(path);
+        try {
+            byte[] buffer = new byte[8];
+            stream.readFully(buffer);
+            return ((buffer[4] & 0xFF)) | ((buffer[5] & 0xFF) << 8)
+                    | ((buffer[6] & 0xFF) << 16) | ((buffer[7] & 0xFF) << 24);
+        } finally {
+            stream.close();
+        }
+    }
+
     public static DatasetReaderV2 getReaderForFile(String file, boolean useCache, boolean useDynamicBlockIndex) throws IOException {
         String magicString = getMagicString(file);
 

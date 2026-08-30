@@ -59,7 +59,7 @@ public class HiCFileTools {
         }
 
         try {
-            DatasetReader reader = new DatasetReaderV2(file, useCache, useDynamicBlockIndex);
+            DatasetReader reader = DatasetReaderFactory.getReader(file, useCache, useDynamicBlockIndex);
             dataset = reader.read();
             verifySupportedHiCFileVersion(reader.getVersion());
         } catch (Exception e) {
@@ -76,10 +76,8 @@ public class HiCFileTools {
                                                              boolean useDynamicBlockIndex) throws IOException {
         if (allowPrinting)
             System.out.println("Reading file: " + file);
-        String magicString = DatasetReaderFactory.getMagicString(file);
-        if (magicString.equals("HIC")) {
-            reader = new DatasetReaderV2(file, useCache, useDynamicBlockIndex);
-        } else {
+        reader = DatasetReaderFactory.getReader(file, useCache, useDynamicBlockIndex);
+        if (reader == null) {
             System.err.println("This version of HIC is no longer supported");
             System.exit(32);
         }

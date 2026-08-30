@@ -152,6 +152,19 @@ public class Dataset {
         }
     }
 
+    /**
+     * All header attributes in stored order, as the other straw flavors expose
+     * them. Includes keys with no dedicated accessor, such as restriction site
+     * or scaling metadata written by newer producers.
+     */
+    public Map<String, String> getAttributes() {
+        return attributes == null ? new LinkedHashMap<String, String>() : attributes;
+    }
+
+    public String getAttribute(String key) {
+        return attributes == null ? null : attributes.get(key);
+    }
+
     public List<NormalizationType> getNormalizationTypes() {
         return normalizationTypes;
     }

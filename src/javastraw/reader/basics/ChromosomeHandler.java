@@ -158,15 +158,21 @@ public class ChromosomeHandler {
 
     private static long[] initializeBoundaries(List<Chromosome> cleanedChromosomes) {
 
-        // for all-by-all view
-        long[] chromosomeBoundaries = new long[cleanedChromosomes.size() - 1];
+        // for all-by-all view; index 0 is the all-by-all pseudo-chromosome in
+        // V6-V9 files, but a file is not required to declare one
+        int first = hasAllByAllFirst(cleanedChromosomes) ? 1 : 0;
+        long[] chromosomeBoundaries = new long[cleanedChromosomes.size() - first];
         long bound = 0;
-        for (int i = 1; i < cleanedChromosomes.size(); i++) {
+        for (int i = first; i < cleanedChromosomes.size(); i++) {
             Chromosome c = cleanedChromosomes.get(i);
             bound += (c.getLength() / 1000);
-            chromosomeBoundaries[i - 1] = bound;
+            chromosomeBoundaries[i - first] = bound;
         }
         return chromosomeBoundaries;
+    }
+
+    private static boolean hasAllByAllFirst(List<Chromosome> chromosomes) {
+        return !chromosomes.isEmpty() && isAllByAll(chromosomes.get(0));
     }
 
     private static Chromosome[] initializeInternalVariables(List<Chromosome> cleanedChromosomes) {
@@ -174,7 +180,11 @@ public class ChromosomeHandler {
     }
 
     private static Chromosome[] initializeWithoutAll(Chromosome[] chromosomesArray) {
-        // array without all by all
+        // array without all by all; only drop the first entry when it really is
+        // the all-by-all pseudo-chromosome, which a file need not declare
+        if (chromosomesArray.length == 0 || !isAllByAll(chromosomesArray[0])) {
+            return chromosomesArray.clone();
+        }
         Chromosome[] chromosomeArrayWithoutAllByAll = new Chromosome[chromosomesArray.length - 1];
         System.arraycopy(chromosomesArray, 1, chromosomeArrayWithoutAllByAll, 0, chromosomesArray.length - 1);
         return chromosomeArrayWithoutAllByAll;

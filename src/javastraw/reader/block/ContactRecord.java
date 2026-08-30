@@ -68,6 +68,18 @@ public class ContactRecord implements Comparable<ContactRecord> {
         return counts;
     }
 
+    /**
+     * Exact integer contact count. V10 files store raw contacts as unsigned
+     * integers, and counts above 2^24 are returned exactly here even though
+     * {@link #getCounts()} must round them to a float. For every other source
+     * this is simply the truncated float value.
+     *
+     * @see V10ContactRecord
+     */
+    public long getExactCount() {
+        return (long) counts;
+    }
+
     @Override
     public int compareTo(ContactRecord contactRecord) {
         if (this.binX != contactRecord.binX) {

@@ -5,7 +5,7 @@ import io.airlift.compress.zstd.ZstdDecompressor;
 import static javastraw.reader.v10.V10.require;
 
 /**
- * Zstandard support for V10 pages and vector chunks (Sections H and J.2).
+ * Zstandard support for V10 stored blocks and vector chunks (Sections H and J.2).
  * <p>
  * The stored payload must be exactly one ordinary Zstandard data frame as
  * defined by RFC 8878: not a skippable frame, not a concatenation of frames,
@@ -16,6 +16,13 @@ import static javastraw.reader.v10.V10.require;
 public final class V10Zstd {
 
     private static final int MAGIC = 0xFD2FB528;
+    private static final ThreadLocal<ZstdDecompressor> DECOMPRESSOR =
+            new ThreadLocal<ZstdDecompressor>() {
+                @Override
+                protected ZstdDecompressor initialValue() {
+                    return new ZstdDecompressor();
+                }
+            };
 
     private V10Zstd() {
     }
@@ -36,7 +43,7 @@ public final class V10Zstd {
         byte[] output = new byte[(int) expectedBytes];
         int produced;
         try {
-            produced = new ZstdDecompressor().decompress(input, offset, length, output, 0, output.length);
+            produced = DECOMPRESSOR.get().decompress(input, offset, length, output, 0, output.length);
         } catch (RuntimeException e) {
             throw new V10FormatException("Zstandard decompression failure: " + e.getMessage(), e);
         }

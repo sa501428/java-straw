@@ -38,14 +38,14 @@ import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
 import javastraw.reader.type.NormalizationType;
 import javastraw.reader.v10.V10;
+import javastraw.reader.v10.V10BlockIndexEntry;
 import javastraw.reader.v10.V10Cursor;
-import javastraw.reader.v10.V10DecodedPage;
 import javastraw.reader.v10.V10ExpectedValueFunction;
 import javastraw.reader.v10.V10FormatException;
 import javastraw.reader.v10.V10Header;
 import javastraw.reader.v10.V10Locator;
-import javastraw.reader.v10.V10Page;
 import javastraw.reader.v10.V10Source;
+import javastraw.reader.v10.V10StoredBlock;
 import javastraw.reader.v10.V10VectorEntry;
 import javastraw.reader.v10.V10VectorIndex;
 import javastraw.reader.v10.V10Zoom;
@@ -54,6 +54,7 @@ import org.broad.igv.util.collections.LRUCache;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -67,11 +68,11 @@ import static javastraw.reader.v10.V10.require;
  * Reader for the consolidated V10 .hic format (hic-format/HiCFormatV10.md).
  * <p>
  * V10 is a distinct wire format rather than an extension of V6-V9: numeric
- * chromosome-pair keys, Zstandard-compressed pages holding several logical
- * blocks, flat delta-coded cell positions with separate value streams, explicit
- * integer counts, chunked normalization and expected-value vectors, and
- * resolutions that may be derived by exact summation from a finer materialized
- * resolution.
+ * chromosome-pair keys, independently Zstandard-compressed logical blocks
+ * addressed by an exact binary block index, flat delta-coded cell positions with
+ * separate value streams, explicit integer counts, chunked normalization and
+ * expected-value vectors, and resolutions that may be derived by exact summation
+ * from a finer materialized resolution.
  * <p>
  * The public java-straw API is unchanged: this reader produces the same
  * {@link Dataset}, {@link Matrix}, {@link MatrixZoomData} and
@@ -82,12 +83,26 @@ import static javastraw.reader.v10.V10.require;
 public class DatasetReaderV10 extends AbstractDatasetReader {
 
     /**
-     * Pages are the decompression and cache unit of the format (Section 16.1),
-     * and one page holds several logical blocks, so a small page cache is kept
-     * even when block caching is off. It is simply larger when caching is on.
+     * The logical block is the decompression and cache unit of the format
+     * (Section H), so a small decompressed-block cache is kept even when
+     * block caching is off. It is simply larger when caching is on.
      */
-    private static final int PAGE_CACHE_SIZE_WITH_CACHING = 32;
-    private static final int PAGE_CACHE_SIZE_MINIMAL = 4;
+    private static final int BLOCK_CACHE_SIZE_WITH_CACHING = 256;
+    private static final int BLOCK_CACHE_SIZE_MINIMAL = 16;
+
+    /**
+     * Upper bound on one coalesced range read. Only physically adjacent stored
+     * records are ever merged, so no unrequested block is fetched; this cap just
+     * keeps a broad query from turning into one enormous read.
+     */
+    private static final long MAX_COALESCED_READ = 8L * 1024 * 1024;
+
+    private static final Comparator<V10BlockIndexEntry> BY_POSITION = new Comparator<V10BlockIndexEntry>() {
+        @Override
+        public int compare(V10BlockIndexEntry a, V10BlockIndexEntry b) {
+            return Long.compare(a.blockPosition, b.blockPosition);
+        }
+    };
 
     private final Dataset dataset;
     private final boolean useCache;
@@ -96,7 +111,7 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
     private V10Header header;
     private final Map<String, V10Locator> matrixDirectory = new LinkedHashMap<>();
     private final Map<String, List<V10Zoom>> zoomCache = Collections.synchronizedMap(new HashMap<String, List<V10Zoom>>());
-    private final LRUCache<Long, V10DecodedPage> pageCache;
+    private final LRUCache<Long, V10StoredBlock> decodedBlockCache;
 
     private V10VectorIndex normIndex;
     private V10VectorIndex expectedIndex;
@@ -107,7 +122,7 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
     public DatasetReaderV10(String path, boolean useCache) {
         super(path);
         this.useCache = useCache;
-        this.pageCache = new LRUCache<>(useCache ? PAGE_CACHE_SIZE_WITH_CACHING : PAGE_CACHE_SIZE_MINIMAL);
+        this.decodedBlockCache = new LRUCache<>(useCache ? BLOCK_CACHE_SIZE_WITH_CACHING : BLOCK_CACHE_SIZE_MINIMAL);
         this.dataset = new Dataset(this);
     }
 
@@ -284,7 +299,7 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
         return getZooms(key, a, b, locator);
     }
 
-    // ---------------------------------------------------------------- pages
+    // --------------------------------------------------------------- blocks
 
     public V10Source getSource() {
         return source;
@@ -295,33 +310,87 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
     }
 
     /**
-     * Reads and validates the page index of a materialized resolution.
+     * Reads and validates the exact block index of a materialized resolution.
      */
-    public List<V10Page> readPageIndex(V10Zoom zoom) throws IOException {
-        if (!zoom.pageIndex.isPresent()) return Collections.emptyList();
-        return V10Page.parseIndex(source.read(zoom.pageIndex.position, zoom.pageIndex.length), zoom, source);
+    public List<V10BlockIndexEntry> readBlockIndex(V10Zoom zoom) throws IOException {
+        if (!zoom.blockIndex.isPresent()) return Collections.emptyList();
+        return V10BlockIndexEntry.parseIndex(source.read(zoom.blockIndex.position, zoom.blockIndex.length),
+                zoom, source);
     }
 
     /**
-     * Fetches, validates and decompresses one page, reusing the cached copy when
-     * caching is enabled.
+     * Fetches, validates and decompresses one stored block, reusing the cached
+     * copy when caching is enabled.
      */
-    public V10DecodedPage readPage(V10Page page) throws IOException {
-        Long key = page.position;
-        synchronized (pageCache) {
-            V10DecodedPage cached = pageCache.get(key);
-            if (cached != null) return cached;
-        }
-        V10DecodedPage decoded = V10DecodedPage.parse(source.read(page.position, page.storedByteLength), page);
-        synchronized (pageCache) {
-            pageCache.put(key, decoded);
-        }
+    public V10StoredBlock readBlock(V10BlockIndexEntry entry) throws IOException {
+        V10StoredBlock cached = cachedBlock(entry);
+        if (cached != null) return cached;
+        V10StoredBlock decoded = V10StoredBlock.parse(
+                source.read(entry.blockPosition, entry.storedByteLength), entry);
+        cacheBlock(entry, decoded);
         return decoded;
     }
 
-    public void clearPageCache() {
-        synchronized (pageCache) {
-            pageCache.clear();
+    /**
+     * Fetches several stored blocks, keyed by block number.
+     * <p>
+     * Every block remains independently decompressed, but stored records that
+     * are physically adjacent are fetched with one range read. That keeps a
+     * broad query from issuing one disk seek or HTTP request per block without
+     * ever reading bytes belonging to a block that was not requested.
+     */
+    public Map<Integer, V10StoredBlock> readBlocks(List<V10BlockIndexEntry> entries) throws IOException {
+        Map<Integer, V10StoredBlock> result = new HashMap<>();
+        List<V10BlockIndexEntry> missing = new ArrayList<>(entries.size());
+        for (V10BlockIndexEntry entry : entries) {
+            V10StoredBlock cached = cachedBlock(entry);
+            if (cached != null) {
+                result.put(entry.blockNumber, cached);
+            } else {
+                missing.add(entry);
+            }
+        }
+        if (missing.isEmpty()) return result;
+
+        Collections.sort(missing, BY_POSITION);
+        int from = 0;
+        while (from < missing.size()) {
+            long start = missing.get(from).blockPosition;
+            long end = V10.add(start, missing.get(from).storedByteLength);
+            int to = from + 1;
+            while (to < missing.size() && missing.get(to).blockPosition == end
+                    && V10.add(end, missing.get(to).storedByteLength) - start <= MAX_COALESCED_READ) {
+                end = V10.add(end, missing.get(to).storedByteLength);
+                to++;
+            }
+            byte[] bytes = source.read(start, end - start);
+            for (int i = from; i < to; i++) {
+                V10BlockIndexEntry entry = missing.get(i);
+                V10StoredBlock decoded = V10StoredBlock.parse(bytes,
+                        (int) (entry.blockPosition - start), (int) entry.storedByteLength, entry);
+                cacheBlock(entry, decoded);
+                result.put(entry.blockNumber, decoded);
+            }
+            from = to;
+        }
+        return result;
+    }
+
+    private V10StoredBlock cachedBlock(V10BlockIndexEntry entry) {
+        synchronized (decodedBlockCache) {
+            return decodedBlockCache.get(entry.blockPosition);
+        }
+    }
+
+    private void cacheBlock(V10BlockIndexEntry entry, V10StoredBlock block) {
+        synchronized (decodedBlockCache) {
+            decodedBlockCache.put(entry.blockPosition, block);
+        }
+    }
+
+    public void clearBlockCache() {
+        synchronized (decodedBlockCache) {
+            decodedBlockCache.clear();
         }
     }
 
@@ -393,9 +462,9 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
     @Override
     public Block readNormalizedBlock(int blockNumber, String zdKey, NormalizationType no, int chr1Index,
                                      int chr2Index, HiCZoom zoom, IndexEntry idx) throws IOException {
-        // V10 stores several logical blocks inside one compressed page, so a block
-        // cannot be addressed by a standalone (position, size) entry.
-        throw new V10FormatException("V10 blocks are addressed through pages; "
+        // V10 blocks are located through the resolution's own exact block index
+        // and need its descriptor to be decoded, not a V6-V9 (position, size) entry.
+        throw new V10FormatException("V10 blocks are addressed through the resolution block index; "
                 + "use MatrixZoomData.getNormalizedBlocksOverlapping(...)");
     }
 

@@ -38,12 +38,12 @@ import javastraw.reader.type.NormalizationType;
 import javastraw.reader.v10.V10;
 import javastraw.reader.v10.V10BlockDecoder;
 import javastraw.reader.v10.V10BlockHeader;
+import javastraw.reader.v10.V10BlockIndexEntry;
 import javastraw.reader.v10.V10Cursor;
-import javastraw.reader.v10.V10DecodedPage;
 import javastraw.reader.v10.V10FormatException;
 import javastraw.reader.v10.V10Grid;
-import javastraw.reader.v10.V10Page;
 import javastraw.reader.v10.V10RecordHandler;
+import javastraw.reader.v10.V10StoredBlock;
 import javastraw.reader.v10.V10Zoom;
 
 import java.io.IOException;
@@ -62,13 +62,21 @@ import java.util.TreeMap;
  * A V10 matrix at one logical resolution.
  * <p>
  * Two storage modes are handled transparently. A <b>materialized</b> resolution
- * reads Zstandard-compressed pages and decodes the logical blocks they contain.
+ * locates each logical block through its exact block index and decodes that
+ * block's own Zstandard record.
  * A <b>derived</b> resolution stores no blocks: its raw values are reconstructed
  * by exact summation from the declared finer materialized source, always before
  * normalization or expected-value division (Section K). Either way, callers see
  * the same {@link Block} and {@link ContactRecord} objects as for V6-V9 files.
  */
 public class V10MatrixZoomData extends MatrixZoomData {
+
+    /**
+     * How many stored blocks a bulk scan fetches at once. Adjacent records are
+     * coalesced into one range read, so a batch bounds both the number of reads
+     * and how many decompressed blocks are held at a time.
+     */
+    private static final int STREAM_BATCH_SIZE = 16;
 
     private final DatasetReaderV10 v10Reader;
     private final V10Zoom v10Zoom;
@@ -80,7 +88,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
     private final long nBins2;
     private final int derivationFactor;
 
-    private List<V10Page> pages;
+    private List<V10BlockIndexEntry> blockIndex;
 
     public V10MatrixZoomData(Chromosome chr1, Chromosome chr2, V10Zoom zoom, DatasetReaderV10 reader,
                              V10MatrixZoomData sourceZD, boolean useCache, long nBins1, long nBins2) {
@@ -159,15 +167,17 @@ public class V10MatrixZoomData extends MatrixZoomData {
         return super.getAverageCount();
     }
 
+    /**
+     * Stored size of one block, matching the V6-V9 contract: the bytes the block
+     * occupies on disk, which the exact block index now gives without any read.
+     */
     @Override
     public Integer getBlockSize(int blockNum) {
         try {
-            List<V10Page> pageList = pages();
-            int pageIndex = V10Page.findPage(pageList, blockNum);
-            if (pageIndex < 0) return null;
-            V10DecodedPage page = v10Reader.readPage(pageList.get(pageIndex));
-            int i = page.indexOf(blockNum);
-            return i < 0 ? null : page.cursorFor(i).size();
+            List<V10BlockIndexEntry> index = blockIndex();
+            int i = V10BlockIndexEntry.find(index, blockNum);
+            if (i < 0) return null;
+            return V10.toInt(index.get(i).storedByteLength, "stored block length");
         } catch (IOException e) {
             return null;
         }
@@ -183,19 +193,35 @@ public class V10MatrixZoomData extends MatrixZoomData {
         System.out.println();
     }
 
-    // ---------------------------------------------------------------- pages
+    // ---------------------------------------------------------- block index
 
-    private synchronized List<V10Page> pages() throws IOException {
-        if (pages == null) {
-            pages = v10Reader.readPageIndex(v10Zoom);
+    private synchronized List<V10BlockIndexEntry> blockIndex() throws IOException {
+        if (blockIndex == null) {
+            blockIndex = v10Reader.readBlockIndex(v10Zoom);
         }
-        return pages;
+        return blockIndex;
+    }
+
+    /**
+     * Index entries for the block numbers a query touches, in index order.
+     * Numbers with no entry denote empty logical blocks and are dropped.
+     */
+    private List<V10BlockIndexEntry> entriesFor(List<V10Grid.BlockRange> ranges) throws IOException {
+        List<V10BlockIndexEntry> index = blockIndex();
+        List<V10BlockIndexEntry> selected = new ArrayList<>();
+        for (V10Grid.BlockRange range : ranges) {
+            int i = V10BlockIndexEntry.lowerBound(index, range.first);
+            while (i < index.size() && index.get(i).blockNumber <= range.last) {
+                selected.add(index.get(i++));
+            }
+        }
+        return selected;
     }
 
     @Override
     void clearCache() {
         super.clearCache();
-        pages = null;
+        blockIndex = null;
     }
 
     // --------------------------------------------------------------- blocks
@@ -221,48 +247,34 @@ public class V10MatrixZoomData extends MatrixZoomData {
      */
     private List<Block> materializedBlocks(long binX1, long binY1, long binX2, long binY2,
                                            NormalizationType no, BlockModifier modifier) throws IOException {
-        List<Integer> blockNumbers = V10Grid.blockNumbersForRegion(binX1, binY1, binX2, binY2,
+        List<V10Grid.BlockRange> ranges = V10Grid.blockRangesForRegion(binX1, binY1, binX2, binY2,
                 v10Zoom, nBins1, nBins2);
-        if (blockNumbers.isEmpty()) return new ArrayList<>();
+        if (ranges.isEmpty()) return new ArrayList<>();
 
-        List<Block> blockList = new ArrayList<>(blockNumbers.size());
-        // Group the blocks still needed by the page that stores them so each page
-        // is fetched and decompressed at most once.
-        Map<Integer, List<Integer>> byPage = new LinkedHashMap<>();
-        List<V10Page> pageList = pages();
-        for (Integer blockNumber : blockNumbers) {
+        List<V10BlockIndexEntry> entries = entriesFor(ranges);
+        List<Block> blockList = new ArrayList<>(entries.size());
+        List<V10BlockIndexEntry> wanted = new ArrayList<>(entries.size());
+        for (V10BlockIndexEntry entry : entries) {
+            int blockNumber = entry.blockNumber;
             String key = BlockLoader.getBlockKey(getKey(), blockNumber, no);
             if (blockCache.containsKey(key)) {
                 blockList.add(blockCache.get(key));
-                continue;
+            } else {
+                wanted.add(entry);
             }
-            int pageIndex = V10Page.findPage(pageList, blockNumber);
-            if (pageIndex < 0) continue;
-            List<Integer> wanted = byPage.get(pageIndex);
-            if (wanted == null) {
-                wanted = new ArrayList<>();
-                byPage.put(pageIndex, wanted);
-            }
-            wanted.add(blockNumber);
         }
+        if (wanted.isEmpty()) return blockList;
 
         NormalizationVector[] norms = normalizationVectors(no);
-        for (Map.Entry<Integer, List<Integer>> entry : byPage.entrySet()) {
-            V10DecodedPage page = v10Reader.readPage(pageList.get(entry.getKey()));
-            for (Integer blockNumber : entry.getValue()) {
-                String key = BlockLoader.getBlockKey(getKey(), blockNumber, no);
-                int indexInPage = page.indexOf(blockNumber);
-                Block block;
-                if (indexInPage < 0) {
-                    // Numbers inside a page range may legitimately be absent.
-                    block = new Block(blockNumber, key);
-                } else {
-                    block = buildBlock(blockNumber, decodeBlock(page, indexInPage, blockNumber), no, norms);
-                }
-                block = modifier.modify(block, key, getBinSize(), chr1, chr2);
-                blockCache.put(key, block);
-                blockList.add(block);
-            }
+        BlockScan scan = new BlockScan(v10Reader, wanted);
+        V10StoredBlock stored;
+        while ((stored = scan.next()) != null) {
+            int blockNumber = stored.getBlockNumber();
+            String key = BlockLoader.getBlockKey(getKey(), blockNumber, no);
+            Block block = buildBlock(blockNumber, decodeBlock(stored), no, norms);
+            block = modifier.modify(block, key, getBinSize(), chr1, chr2);
+            blockCache.put(key, block);
+            blockList.add(block);
         }
         return blockList;
     }
@@ -300,9 +312,9 @@ public class V10MatrixZoomData extends MatrixZoomData {
         return blockList;
     }
 
-    private List<ContactRecord> decodeBlock(V10DecodedPage page, int indexInPage, int blockNumber) {
+    private List<ContactRecord> decodeBlock(V10StoredBlock stored) {
         final List<ContactRecord> records = new ArrayList<>();
-        V10BlockDecoder.decode(page.cursorFor(indexInPage), blockNumber, v10Zoom, nBins1, nBins2, isIntra,
+        V10BlockDecoder.decode(stored.cursor(), stored.getBlockNumber(), v10Zoom, nBins1, nBins2, isIntra,
                 new V10RecordHandler() {
                     @Override
                     public void record(int binColumn, int binRow, long count, float score, boolean isScore) {
@@ -360,42 +372,27 @@ public class V10MatrixZoomData extends MatrixZoomData {
                                           final boolean filterToRegion, final V10RecordHandler handler)
             throws IOException {
         V10.require(!isDerivedResolution(), "resolution is derived; query its source instead");
-        List<V10Page> pageList = pages();
-        List<Integer> blockNumbers = V10Grid.blockNumbersForRegion(binX1, binY1, binX2, binY2,
+        List<V10Grid.BlockRange> ranges = V10Grid.blockRangesForRegion(binX1, binY1, binX2, binY2,
                 v10Zoom, nBins1, nBins2);
         final long x1 = binX1;
         final long x2 = binX2;
         final long y1 = binY1;
         final long y2 = binY2;
 
-        Map<Integer, List<Integer>> byPage = new LinkedHashMap<>();
-        for (Integer blockNumber : blockNumbers) {
-            int pageIndex = V10Page.findPage(pageList, blockNumber);
-            if (pageIndex < 0) continue;
-            List<Integer> wanted = byPage.get(pageIndex);
-            if (wanted == null) {
-                wanted = new ArrayList<>();
-                byPage.put(pageIndex, wanted);
-            }
-            wanted.add(blockNumber);
-        }
-        for (Map.Entry<Integer, List<Integer>> entry : byPage.entrySet()) {
-            V10DecodedPage page = v10Reader.readPage(pageList.get(entry.getKey()));
-            for (Integer blockNumber : entry.getValue()) {
-                int indexInPage = page.indexOf(blockNumber);
-                if (indexInPage < 0) continue;
-                V10BlockDecoder.decode(page.cursorFor(indexInPage), blockNumber, v10Zoom, nBins1, nBins2, isIntra,
-                        new V10RecordHandler() {
-                            @Override
-                            public void record(int binColumn, int binRow, long count, float score, boolean isScore) {
-                                if (filterToRegion && (binColumn < x1 || binColumn > x2
-                                        || binRow < y1 || binRow > y2)) {
-                                    return;
-                                }
-                                handler.record(binColumn, binRow, count, score, isScore);
+        BlockScan scan = new BlockScan(v10Reader, entriesFor(ranges));
+        V10StoredBlock stored;
+        while ((stored = scan.next()) != null) {
+            V10BlockDecoder.decode(stored.cursor(), stored.getBlockNumber(), v10Zoom, nBins1, nBins2,
+                    isIntra, new V10RecordHandler() {
+                        @Override
+                        public void record(int binColumn, int binRow, long count, float score, boolean isScore) {
+                            if (filterToRegion && (binColumn < x1 || binColumn > x2
+                                    || binRow < y1 || binRow > y2)) {
+                                return;
                             }
-                        });
-            }
+                            handler.record(binColumn, binRow, count, score, isScore);
+                        }
+                    });
         }
     }
 
@@ -507,33 +504,26 @@ public class V10MatrixZoomData extends MatrixZoomData {
     }
 
     /**
-     * Walks every stored page in order, decoding one logical block at a time.
+     * Walks every stored block of this resolution in block-number order,
+     * fetching them in batches so adjacent records coalesce into one read.
      */
     private class MaterializedIterator implements Iterator<ContactRecord> {
-        private final List<V10Page> pageList;
-        private int pageIndex = 0;
-        private int blockIndex = 0;
-        private V10DecodedPage page;
+        private final BlockScan scan;
         private Iterator<ContactRecord> current;
 
         MaterializedIterator() throws IOException {
-            pageList = pages();
+            scan = new BlockScan(v10Reader, blockIndex());
         }
 
         @Override
         public boolean hasNext() {
             while (current == null || !current.hasNext()) {
                 try {
-                    if (page == null || blockIndex >= page.blockCount()) {
-                        if (pageIndex >= pageList.size()) return false;
-                        page = v10Reader.readPage(pageList.get(pageIndex++));
-                        blockIndex = 0;
-                    }
-                    int blockNumber = page.blockNumber(blockIndex);
-                    current = decodeBlock(page, blockIndex, blockNumber).iterator();
-                    blockIndex++;
+                    V10StoredBlock stored = scan.next();
+                    if (stored == null) return false;
+                    current = decodeBlock(stored).iterator();
                 } catch (IOException e) {
-                    throw new V10FormatException("could not read page", e);
+                    throw new V10FormatException("could not read block", e);
                 }
             }
             return true;
@@ -552,6 +542,37 @@ public class V10MatrixZoomData extends MatrixZoomData {
     }
 
     /**
+     * Sequential cursor over a list of stored blocks. Blocks are fetched
+     * {@link #STREAM_BATCH_SIZE} at a time so a broad query does not issue one
+     * read per block, while only one batch is decompressed at any moment.
+     */
+    private static class BlockScan {
+        private final DatasetReaderV10 reader;
+        private final List<V10BlockIndexEntry> entries;
+        private int at = 0;
+        private Map<Integer, V10StoredBlock> batch;
+
+        BlockScan(DatasetReaderV10 reader, List<V10BlockIndexEntry> entries) {
+            this.reader = reader;
+            this.entries = entries;
+        }
+
+        /**
+         * The next stored block, or null once the entries are exhausted.
+         */
+        V10StoredBlock next() throws IOException {
+            if (at >= entries.size()) return null;
+            if (at % STREAM_BATCH_SIZE == 0) {
+                batch = reader.readBlocks(
+                        entries.subList(at, Math.min(at + STREAM_BATCH_SIZE, entries.size())));
+            }
+            V10StoredBlock stored = batch.get(entries.get(at++).blockNumber);
+            V10.require(stored != null, "indexed block was not fetched");
+            return stored;
+        }
+    }
+
+    /**
      * Iterates a derived resolution without materializing the whole matrix.
      * <p>
      * Work is driven by the source blocks. For each source block the target
@@ -562,38 +583,30 @@ public class V10MatrixZoomData extends MatrixZoomData {
      * exactly once.
      */
     private class DerivedIterator implements Iterator<ContactRecord> {
-        private final List<V10Page> pageList;
-        private int pageIndex = 0;
-        private int blockIndex = 0;
-        private V10DecodedPage page;
+        private final BlockScan scan;
         private Iterator<ContactRecord> current;
 
         DerivedIterator() throws IOException {
-            pageList = sourceZD.pages();
+            scan = new BlockScan(sourceZD.v10Reader, sourceZD.blockIndex());
         }
 
         @Override
         public boolean hasNext() {
             while (current == null || !current.hasNext()) {
                 try {
-                    if (page == null || blockIndex >= page.blockCount()) {
-                        if (pageIndex >= pageList.size()) return false;
-                        page = sourceZD.v10Reader.readPage(pageList.get(pageIndex++));
-                        blockIndex = 0;
-                    }
-                    current = recordsOwnedBy(page, blockIndex).iterator();
-                    blockIndex++;
+                    V10StoredBlock stored = scan.next();
+                    if (stored == null) return false;
+                    current = recordsOwnedBy(stored).iterator();
                 } catch (IOException e) {
-                    throw new V10FormatException("could not read page", e);
+                    throw new V10FormatException("could not read block", e);
                 }
             }
             return true;
         }
 
-        private List<ContactRecord> recordsOwnedBy(V10DecodedPage sourcePage, int indexInPage)
-                throws IOException {
-            final int blockNumber = sourcePage.blockNumber(indexInPage);
-            V10Cursor cursor = sourcePage.cursorFor(indexInPage);
+        private List<ContactRecord> recordsOwnedBy(V10StoredBlock sourceBlock) throws IOException {
+            final int blockNumber = sourceBlock.getBlockNumber();
+            V10Cursor cursor = sourceBlock.cursor();
             V10BlockHeader header = V10BlockDecoder.readHeader(cursor, sourceZD.v10Zoom,
                     sourceZD.nBins1, sourceZD.nBins2);
 

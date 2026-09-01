@@ -42,6 +42,18 @@ integer-valued record, use `ContactRecord.getExactCount()`, which returns
 `BigInteger` and preserves the complete unsigned range `0..2^64-1`, including
 derived-resolution aggregation. V10 score records remain floating point.
 
+## V10 implementation
+
+The V10 reader implements the final block-index format, not the withdrawn
+page-based draft. Each non-empty logical block is located by its exact `H10I`
+version-2 entry and decompressed from one independent `H10B` Zstandard frame.
+Regional reads compute exact block-number ranges (including the nearest rotated
+cis distance band), binary-search the cached index, and decode positions and
+values in one streaming pass. Parsed matrix descriptors, block indexes,
+decompressed blocks, and per-thread Zstandard decompressors are reused across
+queries. Physically adjacent requested blocks may share one range read, but an
+unrequested block is never decompressed.
+
 ## Build
 
 The repository includes its compile-time JAR dependencies under `lib/`:

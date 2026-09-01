@@ -47,7 +47,7 @@ public final class V10 {
     public static final int TRANSFORM_BYTE_SHUFFLE = 1;
     public static final int TRANSFORM_XOR32 = 2;
 
-    // PageCodec
+    // BlockCodec
     public static final int CODEC_ZSTD = 1;
 
     public static final int NO_SOURCE_RESOLUTION = 0xFFFFFFFF;

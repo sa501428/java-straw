@@ -74,17 +74,21 @@ public final class V10BlockDecoder {
         V10Cursor positions = c.take(positionStreamBytes);
         V10Cursor values = c.take(valueStreamBytes);
 
-        long[] occupiedPositions = null;
+        require(representation != V10.DENSE || valueMode == V10.DIRECT, "dense values must be direct");
+        ValueReader valueReader = new ValueReader(values, valueMode, valueType, slots);
+
         if (representation == V10.SPARSE_DELTA) {
             require(flags == 0 && occupied <= positionStreamBytes, "invalid sparse position stream");
-            occupiedPositions = new long[(int) occupied];
             long previous = 0;
             for (int i = 0; i < (int) occupied; i++) {
                 long delta = positions.varint();
                 require(i == 0 || delta > 0, "duplicate sparse cell");
                 long p = i == 0 ? delta : V10.add(previous, delta);
                 require(p < cells, "sparse position out of bounds");
-                occupiedPositions[i] = p;
+                long value = valueReader.value(i);
+                require(valueType != V10.COUNT_UINT || value != 0,
+                        "sparse/bitmap count must be positive");
+                emit(p, value, h, blockNumber, zoom, nBins1, nBins2, isIntra, handler);
                 previous = p;
             }
         } else if (representation == V10.BITMAP || valueType == V10.SCORE_FLOAT32) {
@@ -95,103 +99,117 @@ public final class V10BlockDecoder {
                 require((positions.peekAt(positionStreamBytes - 1) >>> (cells % 8)) == 0,
                         "nonzero bitmap padding");
             }
-            occupiedPositions = new long[(int) occupied];
-            int found = 0;
+            long found = 0;
             for (long i = 0; i < cells; i++) {
-                if ((positions.peekAt(i / 8) & (1 << (int) (i % 8))) != 0) {
+                boolean present = (positions.peekAt(i / 8) & (1 << (int) (i % 8))) != 0;
+                if (representation == V10.DENSE) {
+                    long value = valueReader.value(i);
+                    if (present) {
+                        require(found < occupied, "bitmap population mismatch");
+                        found++;
+                        emit(i, value, h, blockNumber, zoom, nBins1, nBins2, isIntra, handler);
+                    } else {
+                        require(value == 0, "absent dense score must be positive zero");
+                    }
+                } else if (present) {
                     require(found < occupied, "bitmap population mismatch");
-                    occupiedPositions[found++] = i;
+                    long value = valueReader.value(found++);
+                    require(valueType != V10.COUNT_UINT || value != 0,
+                            "sparse/bitmap count must be positive");
+                    emit(i, value, h, blockNumber, zoom, nBins1, nBins2, isIntra, handler);
                 }
             }
             require(found == occupied, "bitmap population mismatch");
             positions.skipToEnd();
         } else {
             require(flags == 0 && positionStreamBytes == 0, "dense counts have no presence stream");
+            long emitted = 0;
+            for (long i = 0; i < slots; i++) {
+                long value = valueReader.value(i);
+                if (value != 0) {
+                    emit(i, value, h, blockNumber, zoom, nBins1, nBins2, isIntra, handler);
+                    emitted++;
+                }
+            }
+            require(emitted == occupied, "occupied cell count mismatch");
         }
         positions.done();
-        require(representation != V10.DENSE || valueMode == V10.DIRECT, "dense values must be direct");
-
-        long[] decoded = decodeValues(values, valueMode, valueType, slots);
-        values.done();
-
-        long emitted = 0;
-        int nextOccupied = 0;
-        for (long i = 0; i < slots; i++) {
-            boolean present = true;
-            long position = representation == V10.DENSE ? i : occupiedPositions[(int) i];
-            long value = decoded[(int) i];
-            if (representation == V10.DENSE) {
-                if (valueType == V10.COUNT_UINT) {
-                    present = value != 0;
-                } else {
-                    present = nextOccupied < occupiedPositions.length && occupiedPositions[nextOccupied] == i;
-                    if (present) {
-                        nextOccupied++;
-                    } else {
-                        require(value == 0, "absent dense score must be positive zero");
-                    }
-                }
-            } else if (valueType == V10.COUNT_UINT) {
-                require(value != 0, "sparse/bitmap count must be positive");
-            }
-            if (!present) continue;
-
-            long binColumn = binColumnOffset + position % width;
-            long binRow = binRowOffset + position / width;
-            require(binColumn < nBins1 && binRow < nBins2, "cell violates block geometry");
-            require(!isIntra || binRow >= binColumn, "cell violates the canonical cis triangle");
-            int x = V10.toInt(binColumn, "bin column");
-            int y = V10.toInt(binRow, "bin row");
-            require(V10Grid.blockNumber(x, y, zoom) == blockNumber, "cell violates block geometry");
-
-            if (valueType == V10.SCORE_FLOAT32) {
-                handler.record(x, y, 0, V10.bitsToFloat(value), true);
-            } else {
-                handler.record(x, y, value, 0f, false);
-            }
-            emitted++;
-        }
-        require(emitted == occupied, "occupied cell count mismatch");
+        valueReader.done();
     }
 
-    private static long[] decodeValues(V10Cursor values, int valueMode, int valueType, long slots) {
-        long[] decoded = new long[(int) slots];
-        if (valueMode == V10.ALL_DEFAULT) {
-            require(slots > 0, "all-default mode requires at least one value slot");
-            long defaultValue = scalar(values, valueType);
-            for (int i = 0; i < decoded.length; i++) {
-                decoded[i] = defaultValue;
-            }
-        } else if (valueMode == V10.DEFAULT_EXCEPTIONS) {
-            long defaultValue = scalar(values, valueType);
-            long exceptionCount = values.varint();
-            require(exceptionCount > 0 && exceptionCount < slots && exceptionCount <= values.left(),
-                    "invalid exception count");
-            long[] ordinals = new long[(int) exceptionCount];
-            long previous = 0;
-            for (int i = 0; i < ordinals.length; i++) {
-                long delta = values.varint();
-                require(i == 0 || delta > 0, "duplicate exception ordinal");
-                long ordinal = i == 0 ? delta : V10.add(previous, delta);
-                require(ordinal < slots, "exception out of range");
-                ordinals[i] = ordinal;
-                previous = ordinal;
-            }
-            for (int i = 0; i < decoded.length; i++) {
-                decoded[i] = defaultValue;
-            }
-            for (long ordinal : ordinals) {
-                long exception = scalar(values, valueType);
-                require(exception != defaultValue, "exception equals default");
-                decoded[(int) ordinal] = exception;
-            }
+    private static void emit(long position, long value, V10BlockHeader h, int blockNumber,
+                             V10Zoom zoom, long nBins1, long nBins2, boolean isIntra,
+                             V10RecordHandler handler) {
+        long binColumn = h.binColumnOffset + position % h.blockWidth;
+        long binRow = h.binRowOffset + position / h.blockWidth;
+        require(binColumn < nBins1 && binRow < nBins2, "cell violates block geometry");
+        require(!isIntra || binRow >= binColumn, "cell violates the canonical cis triangle");
+        int x = V10.toInt(binColumn, "bin column");
+        int y = V10.toInt(binRow, "bin row");
+        require(V10Grid.blockNumber(x, y, zoom) == blockNumber, "cell violates block geometry");
+        if (h.valueType == V10.SCORE_FLOAT32) {
+            handler.record(x, y, 0, V10.bitsToFloat(value), true);
         } else {
-            require(slots <= values.left() / (valueType == V10.SCORE_FLOAT32 ? 4 : 1), "truncated values");
-            for (int i = 0; i < decoded.length; i++) {
-                decoded[i] = scalar(values, valueType);
+            handler.record(x, y, value, 0f, false);
+        }
+    }
+
+    /** Streaming value decoder; only exception ordinals require temporary storage. */
+    private static final class ValueReader {
+        private final V10Cursor values;
+        private final int mode;
+        private final int type;
+        private final long defaultValue;
+        private final long[] exceptionOrdinals;
+        private int nextException;
+
+        ValueReader(V10Cursor values, int mode, int type, long slots) {
+            this.values = values;
+            this.mode = mode;
+            this.type = type;
+            if (mode == V10.ALL_DEFAULT) {
+                require(slots > 0, "all-default mode requires at least one value slot");
+                defaultValue = scalar(values, type);
+                exceptionOrdinals = null;
+            } else if (mode == V10.DEFAULT_EXCEPTIONS) {
+                defaultValue = scalar(values, type);
+                long count = values.varint();
+                require(count > 0 && count < slots && count <= values.left(), "invalid exception count");
+                exceptionOrdinals = new long[(int) count];
+                long previous = 0;
+                for (int i = 0; i < exceptionOrdinals.length; i++) {
+                    long delta = values.varint();
+                    require(i == 0 || delta > 0, "duplicate exception ordinal");
+                    long ordinal = i == 0 ? delta : V10.add(previous, delta);
+                    require(ordinal < slots, "exception out of range");
+                    exceptionOrdinals[i] = ordinal;
+                    previous = ordinal;
+                }
+            } else {
+                defaultValue = 0;
+                exceptionOrdinals = null;
+                require(slots <= values.left() / (type == V10.SCORE_FLOAT32 ? 4 : 1),
+                        "truncated values");
             }
         }
-        return decoded;
+
+        long value(long ordinal) {
+            if (mode == V10.DIRECT) return scalar(values, type);
+            if (mode == V10.DEFAULT_EXCEPTIONS && nextException < exceptionOrdinals.length
+                    && exceptionOrdinals[nextException] == ordinal) {
+                nextException++;
+                long exception = scalar(values, type);
+                require(exception != defaultValue, "exception equals default");
+                return exception;
+            }
+            return defaultValue;
+        }
+
+        void done() {
+            require(exceptionOrdinals == null || nextException == exceptionOrdinals.length,
+                    "unconsumed exception ordinal");
+            values.done();
+        }
     }
 
     /**

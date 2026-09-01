@@ -1,15 +1,24 @@
 package javastraw.reader.v10;
 
 import java.util.ArrayList;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 
 /**
  * Logical block geometry (Section F): the rectangular trans grid and the
  * rotated cis grid, plus enumeration of the blocks a query rectangle can touch.
  */
 public final class V10Grid {
+
+    /** Inclusive, ordered logical block-number interval. */
+    public static final class BlockRange {
+        public final int first;
+        public final int last;
+
+        BlockRange(int first, int last) {
+            this.first = first;
+            this.last = last;
+        }
+    }
 
     /**
      * Largest long whose square still fits a signed 64-bit integer.
@@ -26,7 +35,10 @@ public final class V10Grid {
      * floating-point behavior near a band boundary (Section F.3).
      */
     public static int alongAntiDiagonal(long binColumn, long binRow, long blockBinCount) {
-        long d = Math.abs(binRow - binColumn);
+        return depthForDistance(Math.abs(binRow - binColumn), blockBinCount);
+    }
+
+    private static int depthForDistance(long d, long blockBinCount) {
         long dd = V10.multiply(d, d);
         long b = V10.multiply(2, V10.multiply(blockBinCount, blockBinCount));
         long quotient = dd / b;
@@ -37,6 +49,45 @@ public final class V10Grid {
             depth++;
         }
         return depth;
+    }
+
+    /**
+     * Exact candidate block-number ranges for an inclusive bin rectangle.
+     * One range is returned per trans row or cis distance band. This is the
+     * representation consumed by the block index so sparse queries never walk
+     * the empty logical block numbers between stored entries.
+     */
+    public static List<BlockRange> blockRangesForRegion(long binX1, long binY1,
+                                                         long binX2, long binY2,
+                                                         V10Zoom zoom, long nBins1, long nBins2) {
+        List<BlockRange> ranges = new ArrayList<>();
+        long b = zoom.blockBinCount;
+        long x1 = Math.max(0, Math.min(binX1, binX2));
+        long x2 = Math.min(nBins1 - 1, Math.max(binX1, binX2));
+        long y1 = Math.max(0, Math.min(binY1, binY2));
+        long y2 = Math.min(nBins2 - 1, Math.max(binY1, binY2));
+        if (x1 > x2 || y1 > y2) return ranges;
+
+        if (zoom.isRotatedCis()) {
+            long firstPad = V10.add(x1, y1) / (2 * b);
+            long lastPad = V10.add(x2, y2) / (2 * b);
+            long nearest = x2 < y1 ? y1 - x2 : y2 < x1 ? x1 - y2 : 0;
+            long farthest = Math.max(Math.abs(y2 - x1), Math.abs(x2 - y1));
+            int firstDepth = depthForDistance(nearest, b);
+            int lastDepth = depthForDistance(farthest, b);
+            for (int depth = firstDepth; depth <= lastDepth; depth++) {
+                addRange(ranges, depth * (long) zoom.blockColumnCount + firstPad,
+                        depth * (long) zoom.blockColumnCount + lastPad);
+            }
+        } else {
+            long firstColumn = x1 / b;
+            long lastColumn = x2 / b;
+            for (long row = y1 / b; row <= y2 / b; row++) {
+                addRange(ranges, row * zoom.blockColumnCount + firstColumn,
+                        row * zoom.blockColumnCount + lastColumn);
+            }
+        }
+        return ranges;
     }
 
     /**
@@ -61,49 +112,19 @@ public final class V10Grid {
      */
     public static List<Integer> blockNumbersForRegion(long binX1, long binY1, long binX2, long binY2,
                                                       V10Zoom zoom, long nBins1, long nBins2) {
-        long b = zoom.blockBinCount;
-        Set<Integer> blocks = new LinkedHashSet<>();
-
-        long x1 = Math.max(0, Math.min(binX1, binX2));
-        long x2 = Math.min(nBins1 - 1, Math.max(binX1, binX2));
-        long y1 = Math.max(0, Math.min(binY1, binY2));
-        long y2 = Math.min(nBins2 - 1, Math.max(binY1, binY2));
-        if (x1 > x2 || y1 > y2) return new ArrayList<>(blocks);
-
-        if (zoom.isRotatedCis()) {
-            long lowerPAD = (x1 + y1) / 2 / b;
-            long higherPAD = (x2 + y2) / 2 / b + 1;
-            int nearerDepth = alongAntiDiagonal(x1, y2, b);
-            int furtherDepth = alongAntiDiagonal(x2, y1, b);
-            int nearest = Math.min(nearerDepth, furtherDepth);
-            // A rectangle straddling the diagonal reaches distance zero, whatever
-            // its corner distances are.
-            if (x1 <= y2 && y1 <= x2) {
-                nearest = 0;
-            }
-            int furthest = Math.max(nearerDepth, furtherDepth) + 1;
-            for (long depth = nearest; depth <= furthest; depth++) {
-                for (long pad = lowerPAD; pad <= higherPAD; pad++) {
-                    addIfValid(blocks, depth * zoom.blockColumnCount + pad);
-                }
-            }
-        } else {
-            long col1 = x1 / b;
-            long col2 = x2 / b;
-            long row1 = y1 / b;
-            long row2 = y2 / b;
-            for (long r = row1; r <= row2; r++) {
-                for (long c = col1; c <= col2; c++) {
-                    addIfValid(blocks, r * zoom.blockColumnCount + c);
-                }
+        List<Integer> blocks = new ArrayList<>();
+        for (BlockRange range : blockRangesForRegion(binX1, binY1, binX2, binY2,
+                zoom, nBins1, nBins2)) {
+            for (int number = range.first; ; number++) {
+                blocks.add(number);
+                if (number == range.last) break;
             }
         }
-        return new ArrayList<>(blocks);
+        return blocks;
     }
 
-    private static void addIfValid(Set<Integer> blocks, long number) {
-        if (number >= 0 && number <= Integer.MAX_VALUE) {
-            blocks.add((int) number);
-        }
+    private static void addRange(List<BlockRange> ranges, long first, long last) {
+        ranges.add(new BlockRange(V10.toInt(V10.unsigned32(first), "block number"),
+                V10.toInt(V10.unsigned32(last), "block number")));
     }
 }

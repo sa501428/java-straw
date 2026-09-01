@@ -32,8 +32,13 @@ public class V10Zoom {
      */
     public int blockBinCount;
     public int blockColumnCount;
-    public V10Locator pageIndex;
-    public int pageCount;
+    /**
+     * Exact block index of a non-empty materialized resolution; absent otherwise.
+     */
+    public V10Locator blockIndex;
+    /**
+     * Number of physically stored non-empty blocks; zero when derived or empty.
+     */
     public int logicalBlockCount;
 
     public boolean isDerived() {
@@ -94,9 +99,9 @@ public class V10Zoom {
             z.percent95 = V10.bitsToFloat(c.word());
             z.blockBinCount = c.wordAsInt("block bin count");
             z.blockColumnCount = c.wordAsInt("block column count");
-            z.pageIndex = V10Locator.read(c);
-            z.pageCount = c.wordAsInt("page count");
+            z.blockIndex = V10Locator.read(c);
             z.logicalBlockCount = c.wordAsInt("logical block count");
+            c.zero(4);
 
             int unit = i < bpCount ? V10.UNIT_BP : V10.UNIT_FRAG;
             int ri = i - (unit == V10.UNIT_FRAG ? bpCount : 0);
@@ -111,16 +116,16 @@ public class V10Zoom {
             long expectedColumns = (header.bins(chr1, unit, ri) + z.blockBinCount - 1) / z.blockBinCount;
             require(z.blockColumnCount == expectedColumns, "invalid block column count");
             if (z.isDerived()) {
-                require(z.pageIndex.position == 0 && z.pageCount == 0 && z.logicalBlockCount == 0,
+                require(!z.blockIndex.isPresent() && z.logicalBlockCount == 0,
                         "derived resolution has storage");
             } else if (z.occupiedCellCount > 0) {
-                require(z.pageIndex.position != 0 && z.pageCount > 0 && z.logicalBlockCount > 0,
-                        "missing matrix pages");
+                require(z.blockIndex.isPresent() && z.logicalBlockCount > 0, "missing matrix blocks");
             } else {
-                require(z.pageCount == 0 && z.logicalBlockCount == 0, "empty matrix has pages");
+                require(!z.blockIndex.isPresent() && z.logicalBlockCount == 0,
+                        "empty matrix has block storage");
             }
-            if (z.pageIndex.isPresent()) {
-                source.interval(z.pageIndex.position, z.pageIndex.length);
+            if (z.blockIndex.isPresent()) {
+                source.interval(z.blockIndex.position, z.blockIndex.length);
             }
             result.add(z);
         }

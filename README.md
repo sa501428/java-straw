@@ -54,6 +54,10 @@ decompressed blocks, and per-thread Zstandard decompressors are reused across
 queries. Physically adjacent requested blocks may share one range read, but an
 unrequested block is never decompressed.
 
+The standard v10 resolution pyramid is a writer default, not a reader constraint.
+Java Straw follows each resolution's declared materialized/derived mode and direct
+materialized source, including custom base resolutions and derivation patterns.
+
 ## Build
 
 The repository includes its compile-time JAR dependencies under `lib/`:

@@ -146,8 +146,6 @@ public class V10Header {
                 list.add(new V10Resolution((int) binSize, storageMode, aggregation, source));
             }
         }
-        validateMandatoryDerivationPolicy(h.resolutions[V10.UNIT_BP]);
-
         h.fragmentSiteCounts = new int[h.chromosomes.size()];
         if (!h.resolutions[V10.UNIT_FRAG].isEmpty()) {
             for (int i = 0; i < h.chromosomes.size(); i++) {
@@ -184,34 +182,4 @@ public class V10Header {
         return h;
     }
 
-    /**
-     * The five mandatory BP derivations and the materialized 500 kb rule
-     * (Section C.3).
-     */
-    private static void validateMandatoryDerivationPolicy(List<V10Resolution> bp) {
-        for (int i = 0; i < bp.size(); i++) {
-            V10Resolution r = bp.get(i);
-            int requiredSource = requiredSourceBinSize(r.binSize);
-            if (requiredSource > 0) {
-                int sourceIndex = -1;
-                for (int j = 0; j < bp.size(); j++) {
-                    if (bp.get(j).binSize == requiredSource) {
-                        sourceIndex = j;
-                        break;
-                    }
-                }
-                require(sourceIndex >= 0 && r.isDerived() && r.sourceResolutionIndex == sourceIndex
-                                && !bp.get(sourceIndex).isDerived(),
-                        "mandatory BP derivation policy is not satisfied");
-            }
-            require(r.binSize != 500000 || !r.isDerived(), "500 kb must be materialized");
-        }
-    }
-
-    private static int requiredSourceBinSize(int binSize) {
-        if (binSize == 20 || binSize == 50) return 10;
-        if (binSize == 200 || binSize == 500) return 100;
-        if (binSize == 2000) return 1000;
-        return 0;
-    }
 }

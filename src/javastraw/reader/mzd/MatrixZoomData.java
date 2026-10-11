@@ -244,6 +244,12 @@ public class MatrixZoomData {
         return (sumCounts / nBins1) / nBins2;   // <= trying to avoid overflows
     }
 
+    /** Trans O/E denominator, retaining the legacy fallback for older files. */
+    public double getExpectedValueForTrans() {
+        double average = getAverageCount();
+        return average > 0 ? average : 1;
+    }
+
     void clearCache() {
         blockCache.clear();
         pearsonsMap.clear();

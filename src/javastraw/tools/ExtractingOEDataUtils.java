@@ -104,6 +104,8 @@ public class ExtractingOEDataUtils {
                                                   boolean isIntra, boolean fillUnderDiagonal, ExpectedValueFunction df,
                                                   int chrIndex, float pseudocount, ThresholdType thresholdType,
                                                   double threshold, float invalidReplacement) throws IOException {
+        double transExpected = isIntra ? Double.NaN : zd.getExpectedValueForTrans();
+        if (!isIntra && Double.isNaN(transExpected)) return new ArrayList<>();
         List<Block> blocks = HiCFileTools.getAllRegionBlocks(zd, binXStart, binXEnd, binYStart, binYEnd,
                 normalizationType, fillUnderDiagonal);
         List<ContactRecord> records = new ArrayList<>();
@@ -111,7 +113,7 @@ public class ExtractingOEDataUtils {
         for (Block b : blocks) {
             if (b != null) {
                 for (ContactRecord rec : b.getContactRecords()) {
-                    double expected = getExpected(rec, df, chrIndex, isIntra, zd.getAverageCount());
+                    double expected = getExpected(rec, df, chrIndex, isIntra, transExpected);
                     double val = rec.getCounts();
 
                     double observed = val + pseudocount;
@@ -168,7 +170,7 @@ public class ExtractingOEDataUtils {
             int dist = Math.abs(x - y);
             expected = df.getExpectedValue(chrIndex, dist);
         } else {
-            expected = (averageCount > 0 ? averageCount : 1);
+            expected = averageCount;
         }
         return expected;
     }

@@ -163,8 +163,17 @@ public class V10MatrixZoomData extends MatrixZoomData {
 
     @Override
     public double getAverageCount() {
-        if (v10Zoom.isScore()) return Double.NaN;
-        return super.getAverageCount();
+        // V10 geometry includes partial BP bins and uses fragment counts for FRAG.
+        // The raw whole-matrix mean is the trans expected denominator, including
+        // for callers that normalize the observed numerator (legacy V9 behavior).
+        if (nBins1 == 0 || nBins2 == 0) return Double.NaN;
+        return (v10Zoom.getSum() / nBins1) / nBins2;
+    }
+
+    @Override
+    public double getExpectedValueForTrans() {
+        double average = getAverageCount();
+        return average != 0 && Double.isFinite(average) ? average : Double.NaN;
     }
 
     /**

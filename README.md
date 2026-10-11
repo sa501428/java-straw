@@ -58,6 +58,16 @@ The standard v10 resolution pyramid is a writer default, not a reader constraint
 Java Straw follows each resolution's declared materialized/derived mode and direct
 materialized source, including custom base resolutions and derivation patterns.
 
+For V10 trans O/E, `MatrixZoomData.getAverageCount()` supplies the raw full-matrix
+mean `(sumCountsOrScores / nBins1) / nBins2`, including for score matrices.
+The bin counts follow V10 geometry (partial BP bins and FRAG bins) at the
+requested logical resolution, including derived resolutions. Existing trans
+O/E extraction applies normalization to the numerator and uses this raw mean
+as its denominator, as with V9; no cis expected vectors are needed.
+`getExpectedValueForTrans()` marks zero or non-finite V10 means unavailable;
+finite negative score means remain valid for arithmetic O/E. Older formats
+retain Java Straw's existing fallback behavior.
+
 ## Build
 
 The repository includes its compile-time JAR dependencies under `lib/`:

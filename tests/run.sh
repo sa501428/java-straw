@@ -11,3 +11,5 @@ java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" V10BlockI
 java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" V10BlockDecoderRegression
 java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" V10ResolutionPolicyRegression
 java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" CallerOrientationRegression "$root/data/inter.hic"
+java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" TransExpectedRegression \
+  "$root/tests/data/trans-v10.hic" "$root/tests/data/trans-score-v10.hic"

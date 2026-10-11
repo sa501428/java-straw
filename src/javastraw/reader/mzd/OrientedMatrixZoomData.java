@@ -61,6 +61,7 @@ final class OrientedMatrixZoomData extends MatrixZoomData {
         return transpose(delegate.getNormalizedIterator(normType));
     }
     @Override public double getAverageCount() { return delegate.getAverageCount(); }
+    @Override public double getExpectedValueForTrans() { return delegate.getExpectedValueForTrans(); }
     @Override public Integer getBlockSize(int blockNum) { return delegate.getBlockSize(blockNum); }
     @Override void clearCache() { delegate.clearCache(); }
 

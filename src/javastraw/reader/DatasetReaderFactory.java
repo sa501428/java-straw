@@ -24,15 +24,9 @@
 
 package javastraw.reader;
 
-import htsjdk.samtools.seekablestream.SeekableHTTPStream;
 import htsjdk.samtools.seekablestream.SeekableStream;
-import htsjdk.tribble.util.LittleEndianInputStream;
 
-import java.io.BufferedInputStream;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.net.MalformedURLException;
-import java.net.URL;
 
 public class DatasetReaderFactory {
 
@@ -48,7 +42,9 @@ public class DatasetReaderFactory {
             System.err.println("This version is deprecated and is no longer supported.");
             return null;
         }
-        if (getVersion(file) == javastraw.reader.v10.V10.VERSION) {
+        int version = getVersion(file);
+        if (version < 6 || version > 10) throw new IOException("Unsupported hic version: " + version);
+        if (version == javastraw.reader.v10.V10.VERSION) {
             return new DatasetReaderV10(file, useCache);
         }
         return new DatasetReaderV2(file, useCache, useDynamicBlockIndex);
@@ -86,28 +82,10 @@ public class DatasetReaderFactory {
     }
 
     public static String getMagicString(String path) throws IOException {
-
-        SeekableStream stream = null;
-        LittleEndianInputStream dis = null;
-
-        try {
-            stream = new SeekableHTTPStream(new URL(path)); // IGVSeekableStreamFactory.getStreamFor(path);
-            dis = new LittleEndianInputStream(new BufferedInputStream(stream));
-        } catch (MalformedURLException e) {
-            try {
-                dis = new LittleEndianInputStream(new FileInputStream(path));
-            } catch (Exception e2) {
-                System.out.println("File could not be found\n(" + path + ")");
-                System.out.println(e2.getLocalizedMessage());
-            }
-        } finally {
-            if (stream != null) stream.close();
-
+        try (SeekableStream stream = ReaderTools.getValidStream(path)) {
+            byte[] magic = new byte[4];
+            stream.readFully(magic);
+            return magic[0] == 'H' && magic[1] == 'I' && magic[2] == 'C' && magic[3] == 0 ? "HIC" : null;
         }
-        if (dis != null) {
-            return dis.readString();
-        }
-        return null;
     }
-
 }

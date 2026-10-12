@@ -38,6 +38,7 @@ public class ChromosomeHandler {
     private final long[] chromosomeBoundaries;
     private final Chromosome[] chromosomesArray;
     private final Chromosome[] chromosomeArrayWithoutAllByAll;
+    private final boolean preserveExactNames;
     private final Chromosome[] chromosomeArrayAutosomesOnly;
 
     public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean inferID) {
@@ -45,6 +46,10 @@ public class ChromosomeHandler {
     }
 
     public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean inferID, boolean createAllChr) {
+        this(chromosomes, genomeID, inferID, createAllChr, false);
+    }
+    public ChromosomeHandler(List<Chromosome> chromosomes, String genomeID, boolean inferID, boolean createAllChr, boolean preserveExactNames) {
+        this.preserveExactNames = preserveExactNames;
 
         if (inferID) {
             String inferGenomeId = inferGenomeId();
@@ -73,7 +78,7 @@ public class ChromosomeHandler {
     }
 
     public static boolean isAllByAll(String name) {
-        return name.toLowerCase().contains("all");
+        return name != null && name.equalsIgnoreCase("all");
     }
 
     public static void sort(List<Chromosome> indices) {
@@ -138,7 +143,7 @@ public class ChromosomeHandler {
     private List<Chromosome> initializeCleanedChromosomesList(List<Chromosome> chromosomes) {
         List<Chromosome> cleanedChromosomes = new ArrayList<>();
         for (Chromosome c : chromosomes) {
-            String cleanName = cleanUpName(c.getName());
+            String cleanName = preserveExactNames ? c.getName() : cleanUpName(c.getName());
             Chromosome cleanChromosome = new Chromosome(c.getIndex(), cleanName, c.getLength());
             cleanedChromosomes.add(cleanChromosome);
         }
@@ -149,6 +154,7 @@ public class ChromosomeHandler {
         Map<String, Chromosome> chromosomeMap = new HashMap<>();
         for (Chromosome c : cleanedChromosomes) {
             chromosomeMap.put(c.getName(), c);
+            chromosomeMap.put(c.getName().startsWith("chr") ? c.getName().substring(3) : "chr" + c.getName(), c);
             if (c.getName().equalsIgnoreCase("MT")) {
                 chromosomeMap.put("M", c); // special case for mitochondria
             }
@@ -158,15 +164,13 @@ public class ChromosomeHandler {
 
     private static long[] initializeBoundaries(List<Chromosome> cleanedChromosomes) {
 
-        // for all-by-all view; index 0 is the all-by-all pseudo-chromosome in
-        // V6-V9 files, but a file is not required to declare one
-        int first = hasAllByAllFirst(cleanedChromosomes) ? 1 : 0;
-        long[] chromosomeBoundaries = new long[cleanedChromosomes.size() - first];
+        List<Chromosome> real = new ArrayList<>();
+        for (Chromosome c : cleanedChromosomes) if (!isAllByAll(c)) real.add(c);
+        long[] chromosomeBoundaries = new long[real.size()];
         long bound = 0;
-        for (int i = first; i < cleanedChromosomes.size(); i++) {
-            Chromosome c = cleanedChromosomes.get(i);
-            bound += (c.getLength() / 1000);
-            chromosomeBoundaries[i - first] = bound;
+        for (int i = 0; i < real.size(); i++) {
+            bound += real.get(i).getLength() / 1000;
+            chromosomeBoundaries[i] = bound;
         }
         return chromosomeBoundaries;
     }
@@ -180,14 +184,9 @@ public class ChromosomeHandler {
     }
 
     private static Chromosome[] initializeWithoutAll(Chromosome[] chromosomesArray) {
-        // array without all by all; only drop the first entry when it really is
-        // the all-by-all pseudo-chromosome, which a file need not declare
-        if (chromosomesArray.length == 0 || !isAllByAll(chromosomesArray[0])) {
-            return chromosomesArray.clone();
-        }
-        Chromosome[] chromosomeArrayWithoutAllByAll = new Chromosome[chromosomesArray.length - 1];
-        System.arraycopy(chromosomesArray, 1, chromosomeArrayWithoutAllByAll, 0, chromosomesArray.length - 1);
-        return chromosomeArrayWithoutAllByAll;
+        List<Chromosome> real = new ArrayList<>();
+        for (Chromosome c : chromosomesArray) if (!isAllByAll(c)) real.add(c);
+        return real.toArray(new Chromosome[0]);
     }
 
     private static Chromosome[] initializeAutosomes(Chromosome[] chromosomeArrayWithoutAllByAll) {
@@ -235,11 +234,16 @@ public class ChromosomeHandler {
     }
 
     public Chromosome getChromosomeFromName(String name) {
+        if (name == null) return null;
+        Chromosome exact = chromosomeMap.get(name);
+        if (exact != null) return exact;
+        if (isAllByAll(name)) for (Chromosome c : chromosomesArray)
+            if (isAllByAll(c)) return c;
         return chromosomeMap.get(cleanUpName(name));
     }
 
     public boolean doesNotContainChromosome(String name) {
-        return !chromosomeMap.containsKey(cleanUpName(name));
+        return getChromosomeFromName(name) == null;
     }
 
     public int size() {

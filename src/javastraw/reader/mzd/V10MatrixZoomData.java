@@ -321,6 +321,24 @@ public class V10MatrixZoomData extends MatrixZoomData {
         return blockList;
     }
 
+    /** Exact physical-block access for adapters with a block-based API. */
+    public List<Integer> getPhysicalBlockNumbers() throws IOException {
+        List<Integer> numbers = new ArrayList<>();
+        if (!isDerivedResolution()) for (V10BlockIndexEntry entry : blockIndex()) numbers.add(entry.blockNumber);
+        return numbers;
+    }
+
+    public Block readNormalizedBlock(int blockNumber, NormalizationType normalization) throws IOException {
+        if (isDerivedResolution()) throw new IOException("Derived v10 resolutions have no physical blocks; use regional queries or iterators");
+        List<V10BlockIndexEntry> entries = blockIndex();
+        int index = V10BlockIndexEntry.lowerBound(entries, blockNumber);
+        if (index < entries.size() && entries.get(index).blockNumber == blockNumber) {
+            V10BlockIndexEntry entry = entries.get(index);
+            return buildBlock(blockNumber, decodeBlock(v10Reader.readBlock(entry)), normalization, normalizationVectors(normalization));
+        }
+        return null;
+    }
+
     private List<ContactRecord> decodeBlock(V10StoredBlock stored) {
         final List<ContactRecord> records = new ArrayList<>();
         V10BlockDecoder.decode(stored.cursor(), stored.getBlockNumber(), v10Zoom, nBins1, nBins2, isIntra,
@@ -361,6 +379,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
         List<ContactRecord> normalized = new ArrayList<>(records.size());
         for (ContactRecord record : records) {
             double denominator = nv1.get(record.getBinX()) * nv2.get(record.getBinY());
+            if (!Double.isFinite(denominator) || denominator == 0) continue;
             float counts = (float) (record.getCounts() / denominator);
             if (!Float.isNaN(counts)) {
                 normalized.add(new ContactRecord(record.getBinX(), record.getBinY(), counts));
@@ -688,6 +707,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
             while (next == null && source.hasNext()) {
                 ContactRecord record = source.next();
                 double denominator = nv1.get(record.getBinX()) * nv2.get(record.getBinY());
+                if (!Double.isFinite(denominator) || denominator == 0) continue;
                 float counts = (float) (record.getCounts() / denominator);
                 if (!Float.isNaN(counts)) {
                     next = new ContactRecord(record.getBinX(), record.getBinY(), counts);

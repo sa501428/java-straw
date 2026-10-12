@@ -23,6 +23,7 @@ public class V10Header {
     public V10Locator normExpectedValueIndex;
 
     public String genomeId;
+    public V10AllOverview allOverview;
     /**
      * Attribute pairs in stored order, duplicates preserved (Section C.2).
      */
@@ -41,6 +42,7 @@ public class V10Header {
      * has n + 1 fragments.
      */
     public int[] fragmentSiteCounts;
+    public long[][] fragmentSites;
     public final List<String> normalizations = new ArrayList<>();
 
     /**
@@ -147,15 +149,19 @@ public class V10Header {
             }
         }
         h.fragmentSiteCounts = new int[h.chromosomes.size()];
+        h.fragmentSites = new long[h.chromosomes.size()][];
+        for (int i = 0; i < h.fragmentSites.length; i++) h.fragmentSites[i] = new long[0];
         if (!h.resolutions[V10.UNIT_FRAG].isEmpty()) {
             for (int i = 0; i < h.chromosomes.size(); i++) {
                 long nSites = c.word();
                 require(nSites <= c.left() / 8 && nSites <= Integer.MAX_VALUE - 1,
                         "fragment-site count out of bounds");
+                h.fragmentSites[i] = new long[(int) nSites];
                 long previous = 0;
                 for (long j = 0; j < nSites; j++) {
                     long site = c.wide();
                     require(site > previous && site < h.chromosomes.get(i).getLength(), "invalid fragment site");
+                    h.fragmentSites[i][(int) j] = site;
                     previous = site;
                 }
                 h.fragmentSiteCounts[i] = (int) nSites;
@@ -179,6 +185,7 @@ public class V10Header {
                 }
             }
         }
+        h.allOverview = V10AllOverview.from(h);
         return h;
     }
 

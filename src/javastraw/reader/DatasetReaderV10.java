@@ -163,7 +163,7 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
         // the matrix key, so entry zero is never rewritten into an all-by-all
         // pseudo-chromosome the way V6-V9 files assume.
         ChromosomeHandler chromosomeHandler = new ChromosomeHandler(
-                new ArrayList<>(header.chromosomes), header.genomeId, false, false);
+                new ArrayList<>(header.chromosomes), header.genomeId, false, false, true);
         dataset.setChromosomeHandler(chromosomeHandler);
         dataset.setGenomeId(chromosomeHandler.getGenomeID());
         dataset.setBpZooms(header.binSizes(V10.UNIT_BP));

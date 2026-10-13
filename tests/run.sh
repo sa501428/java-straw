@@ -19,4 +19,5 @@ if [ "${JAVA_STRAW_TEST_HTTP:-0}" = 1 ]; then
   java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" HttpRangeRegression "$root/tests/data/cis-v10.hic"
 fi
 
-java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" ScaledAllRegression "$root/tests/data/pseudo-all.hic"
+java -ea -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" ScaledAllRegression "$root/tests/data/pseudo-all.hic" "$root/tests/data/kilobase-all.hic"
+java -ea -Xmx128m -cp "$classes:$root/lib/broadinstitute/*:$root/lib/general/*" V10ReviewRegression "$root/tests/data"

@@ -32,6 +32,23 @@ public class ScaledAllRegression {
         }
         assert count == 3 && sum.equals(BigInteger.ONE.shiftLeft(53).add(BigInteger.valueOf(49)));
         assert reader.readMatrix("0_2", -1) == null;
+        if (args.length > 1) {
+            DatasetReaderV10 kbReader = new DatasetReaderV10(args[1], true); kbReader.read();
+            V10AllOverview kb = kbReader.getHeader().allOverview;
+            assert kb.version == 2 && kb.syntheticLength == 170 && kb.storageStride == 17;
+            assert kb.displayResolution == 17 && kb.effectiveResolution == 17000 && kb.binCount == 10;
+            assert kb.syntheticBoundary(0) == 95 && kb.syntheticBoundary(1) == 170;
+            assert kb.chromosomeForCoordinate(100) == 1 && kb.positionForCoordinate(1, 100) == 5000;
+            Iterator<ContactRecord> raw = kbReader.readMatrix("2_2", -1)
+                .getZoomData(new HiCZoom(HiCZoom.HiCUnit.BP, 1)).getNormalizedIterator(NormalizationHandler.NONE);
+            sum = BigInteger.ZERO; count = 0;
+            while (raw.hasNext()) {
+                ContactRecord record = raw.next();
+                assert record.getBinX() % 17 == 0 && record.getBinY() % 17 == 0;
+                sum = sum.add(record.getExactCount()); ++count;
+            }
+            assert count == 2 && sum.equals(BigInteger.ONE.shiftLeft(53).add(BigInteger.valueOf(49)));
+        }
         System.out.println("Scaled All: metadata, exact counts, appended index, layout and omitted trans passed");
     }
 }

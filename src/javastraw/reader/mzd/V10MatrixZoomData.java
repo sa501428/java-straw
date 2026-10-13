@@ -30,8 +30,6 @@ import javastraw.reader.block.Block;
 import javastraw.reader.block.BlockModifier;
 import javastraw.reader.block.ContactRecord;
 import javastraw.reader.block.V10ContactRecord;
-import javastraw.reader.datastructures.ListOfDoubleArrays;
-import javastraw.reader.norm.NormalizationVector;
 import javastraw.reader.type.HiCZoom;
 import javastraw.reader.type.NormalizationHandler;
 import javastraw.reader.type.NormalizationType;
@@ -57,6 +55,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.TreeMap;
+import java.util.function.LongToDoubleFunction;
 
 /**
  * A V10 matrix at one logical resolution.
@@ -274,7 +273,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
         }
         if (wanted.isEmpty()) return blockList;
 
-        NormalizationVector[] norms = normalizationVectors(no);
+        LongToDoubleFunction[] norms = normalizationVectors(no);
         BlockScan scan = new BlockScan(v10Reader, wanted);
         V10StoredBlock stored;
         while ((stored = scan.next()) != null) {
@@ -311,7 +310,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
             records.add(entry.getValue().toRecord(x, y, v10Zoom.isScore()));
         }
 
-        NormalizationVector[] norms = normalizationVectors(no);
+        LongToDoubleFunction[] norms = normalizationVectors(no);
         List<Block> blockList = new ArrayList<>(byBlock.size());
         for (Map.Entry<Integer, List<ContactRecord>> entry : byBlock.entrySet()) {
             Block block = buildBlock(entry.getKey(), entry.getValue(), no, norms);
@@ -354,19 +353,20 @@ public class V10MatrixZoomData extends MatrixZoomData {
 
     // -------------------------------------------------------- normalization
 
-    private NormalizationVector[] normalizationVectors(NormalizationType no) {
+    private LongToDoubleFunction[] normalizationVectors(NormalizationType no) {
         if (no == null || no.equals(NormalizationHandler.NONE)) return null;
-        NormalizationVector nv1 = v10Reader.getNormalizationVector(getChr1Idx(), getZoom(), no);
-        NormalizationVector nv2 = v10Reader.getNormalizationVector(getChr2Idx(), getZoom(), no);
+        LongToDoubleFunction nv1 = v10Reader.getNormalizationVectorForQuery(getChr1Idx(), getZoom(), no);
+        LongToDoubleFunction nv2 = getChr1Idx() == getChr2Idx() ? nv1
+                : v10Reader.getNormalizationVectorForQuery(getChr2Idx(), getZoom(), no);
         if (nv1 == null || nv2 == null) {
             System.err.println("Norm " + no + " missing for: " + getKey());
             return null;
         }
-        return new NormalizationVector[]{nv1, nv2};
+        return new LongToDoubleFunction[]{nv1, nv2};
     }
 
     private Block buildBlock(int blockNumber, List<ContactRecord> records, NormalizationType no,
-                             NormalizationVector[] norms) {
+                             LongToDoubleFunction[] norms) {
         String key = BlockLoader.getBlockKey(getKey(), blockNumber, no);
         if (no == null || no.equals(NormalizationHandler.NONE)) {
             return new Block(blockNumber, records, key);
@@ -374,11 +374,11 @@ public class V10MatrixZoomData extends MatrixZoomData {
         if (norms == null) {
             return new Block(blockNumber, key);
         }
-        ListOfDoubleArrays nv1 = norms[0].getData();
-        ListOfDoubleArrays nv2 = norms[1].getData();
+        LongToDoubleFunction nv1 = norms[0];
+        LongToDoubleFunction nv2 = norms[1];
         List<ContactRecord> normalized = new ArrayList<>(records.size());
         for (ContactRecord record : records) {
-            double denominator = nv1.get(record.getBinX()) * nv2.get(record.getBinY());
+            double denominator = nv1.applyAsDouble(record.getBinX()) * nv2.applyAsDouble(record.getBinY());
             if (!Double.isFinite(denominator) || denominator == 0) continue;
             float counts = (float) (record.getCounts() / denominator);
             if (!Float.isNaN(counts)) {
@@ -460,13 +460,13 @@ public class V10MatrixZoomData extends MatrixZoomData {
                             inside = y >= x1 && y <= x2 && x >= y1 && x <= y2;
                         }
                         if (!inside) return;
-                        accumulate(sums, x, y, count, score, isScore);
+                        accumulate(sums, x, y, binColumn, binRow, count, score, isScore);
                     }
                 });
         return sums;
     }
 
-    private static void accumulate(Map<Long, Accumulator> sums, int x, int y, long count, float score,
+    private static void accumulate(Map<Long, Accumulator> sums, int x, int y, int sourceX, int sourceY, long count, float score,
                                    boolean isScore) {
         Long key = cellKey(x, y);
         Accumulator accumulator = sums.get(key);
@@ -476,9 +476,9 @@ public class V10MatrixZoomData extends MatrixZoomData {
         }
         if (isScore) {
             V10.require(!Float.isNaN(score) && !Float.isInfinite(score), "nonfinite derived source score");
-            accumulator.score += score;
-            V10.require(!Double.isNaN(accumulator.score) && !Double.isInfinite(accumulator.score),
-                    "derived score overflow");
+            if (accumulator.scores == null) accumulator.scores = new TreeMap<>();
+            V10.require(accumulator.scores.put(cellKey(sourceX, sourceY), score) == null,
+                    "duplicate derived source cell");
         } else {
             accumulator.count = V10.addUnsigned(accumulator.count, count);
         }
@@ -502,11 +502,16 @@ public class V10MatrixZoomData extends MatrixZoomData {
      */
     private static class Accumulator {
         BigInteger count = BigInteger.ZERO;
-        double score;
+        TreeMap<Long, Float> scores;
 
         ContactRecord toRecord(int binColumn, int binRow, boolean isScore) {
-            return isScore ? new ContactRecord(binColumn, binRow, (float) score)
-                    : V10ContactRecord.create(binColumn, binRow, count);
+            if (!isScore) return V10ContactRecord.create(binColumn, binRow, count);
+            double score = 0;
+            for (float value : scores.values()) {
+                score += value;
+                V10.require(Double.isFinite(score), "derived score overflow");
+            }
+            return new ContactRecord(binColumn, binRow, (float) score);
         }
     }
 
@@ -523,9 +528,9 @@ public class V10MatrixZoomData extends MatrixZoomData {
             Iterator<ContactRecord> raw = isDerivedResolution()
                     ? new DerivedIterator() : new MaterializedIterator();
             if (normType == null || normType.equals(NormalizationHandler.NONE)) return raw;
-            NormalizationVector[] norms = normalizationVectors(normType);
+            LongToDoubleFunction[] norms = normalizationVectors(normType);
             if (norms == null) return Collections.<ContactRecord>emptyList().iterator();
-            return new NormalizingIterator(raw, norms[0].getData(), norms[1].getData());
+            return new NormalizingIterator(raw, norms[0], norms[1]);
         } catch (IOException e) {
             throw new V10FormatException("could not iterate " + getKey(), e);
         }
@@ -653,7 +658,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
                             int x = binColumn / factor;
                             int y = binRow / factor;
                             Long key = cellKey(x, y);
-                            accumulate(sums, x, y, count, score, isScore);
+                            accumulate(sums, x, y, binColumn, binRow, count, score, isScore);
                             Long candidate = cellKey(binColumn, binRow);
                             Long existing = smallestSourceCell.get(key);
                             if (existing == null || candidate < existing) {
@@ -692,11 +697,11 @@ public class V10MatrixZoomData extends MatrixZoomData {
      */
     private static class NormalizingIterator implements Iterator<ContactRecord> {
         private final Iterator<ContactRecord> source;
-        private final ListOfDoubleArrays nv1;
-        private final ListOfDoubleArrays nv2;
+        private final LongToDoubleFunction nv1;
+        private final LongToDoubleFunction nv2;
         private ContactRecord next;
 
-        NormalizingIterator(Iterator<ContactRecord> source, ListOfDoubleArrays nv1, ListOfDoubleArrays nv2) {
+        NormalizingIterator(Iterator<ContactRecord> source, LongToDoubleFunction nv1, LongToDoubleFunction nv2) {
             this.source = source;
             this.nv1 = nv1;
             this.nv2 = nv2;
@@ -706,7 +711,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
         public boolean hasNext() {
             while (next == null && source.hasNext()) {
                 ContactRecord record = source.next();
-                double denominator = nv1.get(record.getBinX()) * nv2.get(record.getBinY());
+                double denominator = nv1.applyAsDouble(record.getBinX()) * nv2.applyAsDouble(record.getBinY());
                 if (!Double.isFinite(denominator) || denominator == 0) continue;
                 float counts = (float) (record.getCounts() / denominator);
                 if (!Float.isNaN(counts)) {

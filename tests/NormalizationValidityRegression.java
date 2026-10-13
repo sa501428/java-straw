@@ -9,11 +9,11 @@ import java.util.*;
 public class NormalizationValidityRegression {
     public static void main(String[] args) throws Exception {
         DatasetReaderV10 reader = new DatasetReaderV10(args[0], true) {
-            @Override public NormalizationVector getNormalizationVector(int chr, HiCZoom zoom, NormalizationType type) {
+            @Override public java.util.function.LongToDoubleFunction getNormalizationVectorForQuery(int chr, HiCZoom zoom, NormalizationType type) {
                 ListOfDoubleArrays values = new ListOfDoubleArrays(8, 2);
                 values.set(0, 0);
                 values.set(1, Double.POSITIVE_INFINITY);
-                return new NormalizationVector(type, chr, zoom.getUnit(), zoom.getBinSize(), values);
+                return values::get;
             }
         };
         Dataset ds = reader.read();

@@ -422,26 +422,53 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
         int resolutionIndex = header.resolutionIndex(unitId, binSize);
         if (resolutionIndex < 0) return null;
 
-        boolean useVCForVCSQRT = false;
         int normId = normalizationId(type);
         V10VectorEntry entry = normId < 0 ? null : normIndex.get(normId, chrIdx, unitId, resolutionIndex);
-        if (entry == null && type.equals(NormalizationHandler.VC_SQRT)) {
-            normId = normalizationId(NormalizationHandler.VC);
-            entry = normId < 0 ? null : normIndex.get(normId, chrIdx, unitId, resolutionIndex);
-            useVCForVCSQRT = true;
-        }
         if (entry == null) return null;
 
         double[] raw = entry.read(source, begin, end);
         ListOfDoubleArrays values = new ListOfDoubleArrays(raw.length);
         boolean allNaN = true;
         for (int i = 0; i < raw.length; i++) {
-            double value = useVCForVCSQRT ? Math.sqrt(raw[i]) : raw[i];
+            double value = raw[i];
             values.set(i, value);
             if (!Double.isNaN(raw[i])) allNaN = false;
         }
         if (allNaN) return null;
         return new NormalizationVector(type, chrIdx, unit, binSize, values);
+    }
+
+    /** Bounded, lazy divisors for block queries and iterators. */
+    public java.util.function.LongToDoubleFunction getNormalizationVectorForQuery(
+            int chr, HiCZoom zoom, NormalizationType type) {
+        if (normIndex == null) return null;
+        int unit = zoom.getUnit() == HiCZoom.HiCUnit.FRAG ? V10.UNIT_FRAG : V10.UNIT_BP;
+        int ri = header.resolutionIndex(unit, zoom.getBinSize());
+        int ni = normalizationId(type);
+        if (ri < 0 || ni < 0) return null;
+        final V10VectorEntry entry = normIndex.get(ni, chr, unit, ri);
+        if (entry == null) return null;
+        return new java.util.function.LongToDoubleFunction() {
+            private final Map<Long, double[]> pages = new LinkedHashMap<Long, double[]>(8, .75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<Long, double[]> e) {
+                    return size() > 8;
+                }
+            };
+            @Override public synchronized double applyAsDouble(long index) {
+                if (index < 0 || index >= entry.vectorValueCount) return Double.NaN;
+                long begin = index / 65536 * 65536;
+                double[] page = pages.get(begin);
+                if (page == null) {
+                    try {
+                        page = entry.read(source, begin, Math.min(begin + 65536, entry.vectorValueCount));
+                    } catch (IOException e) {
+                        throw new javastraw.reader.v10.V10FormatException("could not read normalization chunk", e);
+                    }
+                    pages.put(begin, page);
+                }
+                return page[(int) (index - begin)];
+            }
+        };
     }
 
     @Override

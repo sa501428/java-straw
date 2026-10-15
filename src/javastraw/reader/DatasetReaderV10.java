@@ -49,7 +49,6 @@ import javastraw.reader.v10.V10StoredBlock;
 import javastraw.reader.v10.V10VectorEntry;
 import javastraw.reader.v10.V10VectorIndex;
 import javastraw.reader.v10.V10Zoom;
-import org.broad.igv.util.collections.LRUCache;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -111,7 +110,9 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
     private V10Header header;
     private final Map<String, V10Locator> matrixDirectory = new LinkedHashMap<>();
     private final Map<String, List<V10Zoom>> zoomCache = Collections.synchronizedMap(new HashMap<String, List<V10Zoom>>());
-    private final LRUCache<Long, V10StoredBlock> decodedBlockCache;
+    private final Map<Long, V10StoredBlock> decodedBlockCache = new LinkedHashMap<Long, V10StoredBlock>(16, .75f, true);
+    private long decodedBlockBytes;
+    private static final long BLOCK_CACHE_BYTES = 256L * 1024 * 1024;
 
     private V10VectorIndex normIndex;
     private V10VectorIndex expectedIndex;
@@ -122,7 +123,6 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
     public DatasetReaderV10(String path, boolean useCache) {
         super(path);
         this.useCache = useCache;
-        this.decodedBlockCache = new LRUCache<>(useCache ? BLOCK_CACHE_SIZE_WITH_CACHING : BLOCK_CACHE_SIZE_MINIMAL);
         this.dataset = new Dataset(this);
     }
 
@@ -130,12 +130,13 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
      * True when the file at {@code path} declares version 10.
      */
     public static boolean isV10(String path) throws IOException {
-        V10Source probe = new V10Source(path);
-        V10Cursor c = new V10Cursor(probe.read(0, 8));
-        c.magic("HIC\0");
-        long version = c.word();
-        require(version >= 6 && version <= V10.VERSION, "unsupported .hic version " + version);
-        return version == V10.VERSION;
+        try (V10Source probe = new V10Source(path)) {
+            V10Cursor c = new V10Cursor(probe.read(0, 8));
+            c.magic("HIC\0");
+            long version = c.word();
+            require(version >= 6 && version <= V10.VERSION, "unsupported .hic version " + version);
+            return version == V10.VERSION;
+        }
     }
 
     @Override
@@ -384,14 +385,30 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
 
     private void cacheBlock(V10BlockIndexEntry entry, V10StoredBlock block) {
         synchronized (decodedBlockCache) {
+            V10StoredBlock old = decodedBlockCache.remove(entry.blockPosition);
+            if (old != null) decodedBlockBytes -= old.byteSize();
+            if (block.byteSize() > BLOCK_CACHE_BYTES) return;
+            int limit = useCache ? BLOCK_CACHE_SIZE_WITH_CACHING : BLOCK_CACHE_SIZE_MINIMAL;
+            while (!decodedBlockCache.isEmpty() && (decodedBlockCache.size() >= limit
+                    || decodedBlockBytes + block.byteSize() > BLOCK_CACHE_BYTES)) {
+                Long oldest = decodedBlockCache.keySet().iterator().next();
+                decodedBlockBytes -= decodedBlockCache.remove(oldest).byteSize();
+            }
             decodedBlockCache.put(entry.blockPosition, block);
+            decodedBlockBytes += block.byteSize();
         }
     }
 
     public void clearBlockCache() {
         synchronized (decodedBlockCache) {
             decodedBlockCache.clear();
+            decodedBlockBytes = 0;
         }
+    }
+
+    public void close() throws IOException {
+        clearBlockCache();
+        if (source != null) source.close();
     }
 
     // ------------------------------------------------------------- vectors
@@ -449,24 +466,31 @@ public class DatasetReaderV10 extends AbstractDatasetReader {
         final V10VectorEntry entry = normIndex.get(ni, chr, unit, ri);
         if (entry == null) return null;
         return new java.util.function.LongToDoubleFunction() {
-            private final Map<Long, double[]> pages = new LinkedHashMap<Long, double[]>(8, .75f, true) {
-                @Override protected boolean removeEldestEntry(Map.Entry<Long, double[]> e) {
+            private javastraw.reader.v10.V10Chunk currentChunk;
+            private float[] currentValues;
+            private final Map<javastraw.reader.v10.V10Chunk, float[]> pages = new LinkedHashMap<javastraw.reader.v10.V10Chunk, float[]>(8, .75f, true) {
+                @Override protected boolean removeEldestEntry(Map.Entry<javastraw.reader.v10.V10Chunk, float[]> e) {
                     return size() > 8;
                 }
             };
             @Override public synchronized double applyAsDouble(long index) {
                 if (index < 0 || index >= entry.vectorValueCount) return Double.NaN;
-                long begin = index / 65536 * 65536;
-                double[] page = pages.get(begin);
-                if (page == null) {
-                    try {
-                        page = entry.read(source, begin, Math.min(begin + 65536, entry.vectorValueCount));
-                    } catch (IOException e) {
-                        throw new javastraw.reader.v10.V10FormatException("could not read normalization chunk", e);
+                if (currentChunk == null || index < currentChunk.firstValueIndex
+                        || index >= currentChunk.firstValueIndex + currentChunk.valueCount) {
+                    javastraw.reader.v10.V10Chunk chunk = entry.chunks.get(entry.chunkIndex(index));
+                    float[] values = pages.get(chunk);
+                    if (values == null) {
+                        try {
+                            values = source.readVectorChunk(chunk);
+                        } catch (IOException e) {
+                            throw new V10FormatException("could not read normalization chunk", e);
+                        }
+                        pages.put(chunk, values);
                     }
-                    pages.put(begin, page);
+                    currentChunk = chunk;
+                    currentValues = values;
                 }
-                return page[(int) (index - begin)];
+                return currentValues[(int) (index - currentChunk.firstValueIndex)];
             }
         };
     }

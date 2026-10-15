@@ -88,6 +88,11 @@ public class V10MatrixZoomData extends MatrixZoomData {
     private final int derivationFactor;
 
     private List<V10BlockIndexEntry> blockIndex;
+    // View tiles have stable bin rectangles. Reuse their exact raw aggregates
+    // across redraws and normalization changes without retaining source records.
+    private final Map<String, List<ContactRecord>> derivedRawCache = new LinkedHashMap<String, List<ContactRecord>>(16, .75f, true);
+    private long derivedRawBytes;
+    private static final long DERIVED_CACHE_BYTES = 64L * 1024 * 1024;
 
     public V10MatrixZoomData(Chromosome chr1, Chromosome chr2, V10Zoom zoom, DatasetReaderV10 reader,
                              V10MatrixZoomData sourceZD, boolean useCache, long nBins1, long nBins2) {
@@ -230,6 +235,10 @@ public class V10MatrixZoomData extends MatrixZoomData {
     void clearCache() {
         super.clearCache();
         blockIndex = null;
+        synchronized (derivedRawCache) {
+            derivedRawCache.clear();
+            derivedRawBytes = 0;
+        }
     }
 
     // --------------------------------------------------------------- blocks
@@ -296,18 +305,39 @@ public class V10MatrixZoomData extends MatrixZoomData {
      */
     private List<Block> derivedBlocks(long binX1, long binY1, long binX2, long binY2,
                                       NormalizationType no, BlockModifier modifier) throws IOException {
-        Map<Long, Accumulator> aggregated = aggregateDerived(binX1, binY1, binX2, binY2, true);
+        String regionKey = binX1 + "_" + binY1 + "_" + binX2 + "_" + binY2;
+        List<ContactRecord> raw;
+        synchronized (derivedRawCache) { raw = derivedRawCache.get(regionKey); }
+        if (raw == null) {
+            Map<Long, Accumulator> aggregated = aggregateDerived(binX1, binY1, binX2, binY2, true);
+            raw = new ArrayList<>(aggregated.size());
+            for (Map.Entry<Long, Accumulator> entry : aggregated.entrySet()) {
+                raw.add(entry.getValue().toRecord(columnOf(entry.getKey()), rowOf(entry.getKey()), v10Zoom.isScore()));
+            }
+            // Conservative allowance for each record, reference and map overhead.
+            long bytes = 64L + raw.size() * 64L;
+            if (blockCache.getUseCache() && bytes <= DERIVED_CACHE_BYTES) synchronized (derivedRawCache) {
+                List<ContactRecord> old = derivedRawCache.remove(regionKey);
+                if (old != null) derivedRawBytes -= 64L + old.size() * 64L;
+                while (!derivedRawCache.isEmpty() && (derivedRawCache.size() >= 24 || derivedRawBytes + bytes > DERIVED_CACHE_BYTES)) {
+                    String oldest = derivedRawCache.keySet().iterator().next();
+                    derivedRawBytes -= 64L + derivedRawCache.remove(oldest).size() * 64L;
+                }
+                derivedRawCache.put(regionKey, raw);
+                derivedRawBytes += bytes;
+            }
+        }
         Map<Integer, List<ContactRecord>> byBlock = new LinkedHashMap<>();
-        for (Map.Entry<Long, Accumulator> entry : aggregated.entrySet()) {
-            int x = columnOf(entry.getKey());
-            int y = rowOf(entry.getKey());
+        for (ContactRecord record : raw) {
+            int x = record.getBinX();
+            int y = record.getBinY();
             int blockNumber = V10Grid.blockNumber(x, y, v10Zoom);
             List<ContactRecord> records = byBlock.get(blockNumber);
             if (records == null) {
                 records = new ArrayList<>();
                 byBlock.put(blockNumber, records);
             }
-            records.add(entry.getValue().toRecord(x, y, v10Zoom.isScore()));
+            records.add(record);
         }
 
         LongToDoubleFunction[] norms = normalizationVectors(no);

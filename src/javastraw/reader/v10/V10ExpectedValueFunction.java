@@ -28,9 +28,8 @@ public class V10ExpectedValueFunction implements ExpectedValueFunction {
     private final V10VectorEntry entry;
     private final V10Source source;
 
-    private double[] window;
-    private long windowStart = -1;
-    private long windowEnd = -1;
+    private float[] window;
+    private V10Chunk windowChunk;
 
     public V10ExpectedValueFunction(NormalizationType type, HiCZoom.HiCUnit unit, int binSize,
                                     V10VectorEntry entry, V10Source source) {
@@ -65,18 +64,17 @@ public class V10ExpectedValueFunction implements ExpectedValueFunction {
     }
 
     private synchronized double valueAt(long index) {
-        if (window == null || index < windowStart || index >= windowEnd) {
-            long start = Math.max(0, index - WINDOW / 2);
-            long end = Math.min(entry.vectorValueCount, start + WINDOW);
+        if (windowChunk == null || index < windowChunk.firstValueIndex
+                || index >= windowChunk.firstValueIndex + windowChunk.valueCount) {
+            V10Chunk chunk = entry.chunks.get(entry.chunkIndex(index));
             try {
-                window = entry.read(source, start, end);
+                window = source.readVectorChunk(chunk);
             } catch (IOException e) {
                 throw new V10FormatException("could not read expected vector", e);
             }
-            windowStart = start;
-            windowEnd = start + window.length;
+            windowChunk = chunk;
         }
-        return window[(int) (index - windowStart)];
+        return window[(int) (index - windowChunk.firstValueIndex)];
     }
 
     @Override

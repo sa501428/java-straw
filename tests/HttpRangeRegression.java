@@ -10,10 +10,12 @@ public class HttpRangeRegression {
     public static void main(String[] args) throws Exception {
         byte[] bytes = Files.readAllBytes(Paths.get(args[0]));
         AtomicInteger ranges = new AtomicInteger();
+        AtomicInteger heads = new AtomicInteger();
         HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
         server.createContext("/cis.hic", exchange -> {
             exchange.getResponseHeaders().set("Content-Length", Integer.toString(bytes.length));
             if (exchange.getRequestMethod().equals("HEAD")) {
+                heads.incrementAndGet();
                 exchange.sendResponseHeaders(200, -1);
                 exchange.close();
                 return;
@@ -37,11 +39,21 @@ public class HttpRangeRegression {
             DatasetReader reader = DatasetReaderFactory.getReader(url, true, false);
             if (!(reader instanceof DatasetReaderV10)) throw new AssertionError("HTTP factory chose wrong reader");
             Dataset dataset = reader.read();
+            int initialHeads = heads.get();
             int count = 0;
             for (Block block : dataset.getMatrix(dataset.getChromosomeHandler().getChromosomeFromIndex(0), dataset.getChromosomeHandler().getChromosomeFromIndex(0)).getZoomData(new HiCZoom(20)).getNormalizedBlocksOverlapping(0, 0, 3, 3, NormalizationHandler.NONE, false)) {
                 count += block.getContactRecords().size();
             }
             if (count != 3 || ranges.get() == 0) throw new AssertionError("HTTP derived query failed");
+            if (heads.get() != initialHeads) throw new AssertionError("Block reads repeated HTTP size probes");
+            DatasetReaderV10 v10 = (DatasetReaderV10) reader;
+            NormalizationType vc = dataset.getNormalizationHandler().getNormTypeFromString("VC");
+            if (v10.readNormalizationVectorPart(vc, 0, HiCZoom.HiCUnit.BP, 20, 0, 3) == null)
+                throw new AssertionError("Missing normalization fixture");
+            int afterVector = ranges.get();
+            v10.readNormalizationVectorPart(vc, 0, HiCZoom.HiCUnit.BP, 20, 0, 3);
+            if (ranges.get() != afterVector) throw new AssertionError("Normalization chunk was fetched twice");
+            ((DatasetReaderV10) reader).close();
             System.out.println("Java HTTP ranges: factory, header, vectors, blocks, and derived query passed");
         } finally { server.stop(0); }
     }

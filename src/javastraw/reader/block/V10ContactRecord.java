@@ -39,28 +39,30 @@ import java.math.BigInteger;
  */
 public class V10ContactRecord extends ContactRecord {
 
-    private final BigInteger exactCount;
+    private final long exactCount;
 
-    private V10ContactRecord(int binX, int binY, BigInteger exactCount) {
-        super(binX, binY, exactCount.floatValue());
+    private V10ContactRecord(int binX, int binY, long exactCount) {
+        super(binX, binY, exactCount >= 0 ? (float) exactCount
+                : javastraw.reader.v10.V10.unsignedLong(exactCount).floatValue());
         this.exactCount = exactCount;
     }
 
     /** Create a record from the raw two's-complement bits of a V10 uint64. */
     public static ContactRecord create(int binX, int binY, long unsignedBits) {
-        return create(binX, binY, javastraw.reader.v10.V10.unsignedLong(unsignedBits));
+        if (unsignedBits == 0) throw new IllegalArgumentException("V10 count is outside uint64");
+        return new V10ContactRecord(binX, binY, unsignedBits);
     }
 
     public static ContactRecord create(int binX, int binY, BigInteger count) {
         if (count.signum() <= 0 || count.bitLength() > 64) {
             throw new IllegalArgumentException("V10 count is outside uint64");
         }
-        return new V10ContactRecord(binX, binY, count);
+        return new V10ContactRecord(binX, binY, count.longValue());
     }
 
     @Override
     public BigInteger getExactCount() {
-        return exactCount;
+        return javastraw.reader.v10.V10.unsignedLong(exactCount);
     }
 
     @Override

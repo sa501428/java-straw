@@ -53,6 +53,13 @@ public class HttpRangeRegression {
             int afterVector = ranges.get();
             v10.readNormalizationVectorPart(vc, 0, HiCZoom.HiCUnit.BP, 20, 0, 3);
             if (ranges.get() != afterVector) throw new AssertionError("Normalization chunk was fetched twice");
+            v10.clearBlockCache();
+            javastraw.reader.mzd.MatrixZoomData fine = dataset.getMatrix(
+                    dataset.getChromosomeHandler().getChromosomeFromIndex(0),
+                    dataset.getChromosomeHandler().getChromosomeFromIndex(0)).getZoomData(new HiCZoom(10));
+            if (fine.getNormalizedBlocksOverlapping(0, 0, 1, 1, NormalizationHandler.NONE, false).isEmpty())
+                throw new AssertionError("Decoded source block was lost");
+            if (ranges.get() != afterVector) throw new AssertionError("Decoded records refetched their source bytes");
             ((DatasetReaderV10) reader).close();
             System.out.println("Java HTTP ranges: factory, header, vectors, blocks, and derived query passed");
         } finally { server.stop(0); }

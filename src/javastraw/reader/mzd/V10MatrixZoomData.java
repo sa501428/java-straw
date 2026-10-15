@@ -93,6 +93,9 @@ public class V10MatrixZoomData extends MatrixZoomData {
     private final Map<String, List<ContactRecord>> derivedRawCache = new LinkedHashMap<String, List<ContactRecord>>(16, .75f, true);
     private long derivedRawBytes;
     private static final long DERIVED_CACHE_BYTES = 64L * 1024 * 1024;
+    private final Map<Integer, RecordBlock> rawBlockCache = new LinkedHashMap<Integer, RecordBlock>(16, .75f, true);
+    private long rawBlockBytes;
+    private static final long RAW_BLOCK_CACHE_BYTES = 128L * 1024 * 1024;
 
     public V10MatrixZoomData(Chromosome chr1, Chromosome chr2, V10Zoom zoom, DatasetReaderV10 reader,
                              V10MatrixZoomData sourceZD, boolean useCache, long nBins1, long nBins2) {
@@ -239,6 +242,10 @@ public class V10MatrixZoomData extends MatrixZoomData {
             derivedRawCache.clear();
             derivedRawBytes = 0;
         }
+        synchronized (rawBlockCache) {
+            rawBlockCache.clear();
+            rawBlockBytes = 0;
+        }
     }
 
     // --------------------------------------------------------------- blocks
@@ -283,12 +290,21 @@ public class V10MatrixZoomData extends MatrixZoomData {
         if (wanted.isEmpty()) return blockList;
 
         LongToDoubleFunction[] norms = normalizationVectors(no);
-        BlockScan scan = new BlockScan(v10Reader, wanted);
+        List<V10BlockIndexEntry> toRead = new ArrayList<>();
+        for (V10BlockIndexEntry entry : wanted) {
+            RecordBlock packed = cachedRecordBlock(entry.blockNumber);
+            if (packed == null) { toRead.add(entry); continue; }
+            String key = BlockLoader.getBlockKey(getKey(), entry.blockNumber, no);
+            Block block = modifier.modify(buildPackedBlock(entry.blockNumber, packed, no, norms), key, getBinSize(), chr1, chr2);
+            blockCache.put(key, block);
+            blockList.add(block);
+        }
+        BlockScan scan = new BlockScan(v10Reader, toRead);
         V10StoredBlock stored;
         while ((stored = scan.next()) != null) {
             int blockNumber = stored.getBlockNumber();
             String key = BlockLoader.getBlockKey(getKey(), blockNumber, no);
-            Block block = buildBlock(blockNumber, decodeBlock(stored), no, norms);
+            Block block = buildStoredBlock(stored, no, norms);
             block = modifier.modify(block, key, getBinSize(), chr1, chr2);
             blockCache.put(key, block);
             blockList.add(block);
@@ -363,12 +379,17 @@ public class V10MatrixZoomData extends MatrixZoomData {
         int index = V10BlockIndexEntry.lowerBound(entries, blockNumber);
         if (index < entries.size() && entries.get(index).blockNumber == blockNumber) {
             V10BlockIndexEntry entry = entries.get(index);
-            return buildBlock(blockNumber, decodeBlock(v10Reader.readBlock(entry)), normalization, normalizationVectors(normalization));
+            RecordBlock packed = cachedRecordBlock(blockNumber);
+            LongToDoubleFunction[] norms = normalizationVectors(normalization);
+            return packed == null ? buildStoredBlock(v10Reader.readBlock(entry), normalization, norms)
+                    : buildPackedBlock(blockNumber, packed, normalization, norms);
         }
         return null;
     }
 
     private List<ContactRecord> decodeBlock(V10StoredBlock stored) {
+        RecordBlock packed = recordBlock(stored);
+        if (packed != null) return packed.records(v10Zoom.isScore());
         final List<ContactRecord> records = new ArrayList<>();
         V10BlockDecoder.decode(stored.cursor(), stored.getBlockNumber(), v10Zoom, nBins1, nBins2, isIntra,
                 new V10RecordHandler() {
@@ -379,6 +400,112 @@ public class V10MatrixZoomData extends MatrixZoomData {
                     }
                 });
         return records;
+    }
+
+    /** Coordinates and exact value bits, decoded once and shared by every norm. */
+    private RecordBlock cachedRecordBlock(int number) {
+        if (!blockCache.getUseCache()) return null;
+        synchronized (rawBlockCache) { return rawBlockCache.get(number); }
+    }
+
+    private RecordBlock recordBlock(V10StoredBlock stored) {
+        if (!blockCache.getUseCache()) return null;
+        RecordBlock cached = cachedRecordBlock(stored.getBlockNumber());
+        if (cached != null) return cached;
+        V10BlockHeader header = V10BlockDecoder.readHeader(stored.cursor(), v10Zoom, nBins1, nBins2);
+        if (header.occupiedCellCount * 16 > RAW_BLOCK_CACHE_BYTES) return null;
+        final RecordBlock packed = new RecordBlock((int) header.occupiedCellCount);
+        V10BlockDecoder.decode(stored.cursor(), stored.getBlockNumber(), v10Zoom, nBins1, nBins2, isIntra,
+                (x, y, count, score, scored) -> {
+                    int i = packed.size++;
+                    V10.require(i < packed.x.length, "occupied-cell count mismatch");
+                    packed.x[i] = x;
+                    packed.y[i] = y;
+                    packed.values[i] = scored ? Float.floatToRawIntBits(score) : count;
+                });
+        synchronized (rawBlockCache) {
+            RecordBlock previous = rawBlockCache.remove(stored.getBlockNumber());
+            if (previous != null) rawBlockBytes -= previous.byteSize();
+            while (!rawBlockCache.isEmpty() && (rawBlockCache.size() >= 16
+                    || rawBlockBytes + packed.byteSize() > RAW_BLOCK_CACHE_BYTES)) {
+                Integer oldest = rawBlockCache.keySet().iterator().next();
+                rawBlockBytes -= rawBlockCache.remove(oldest).byteSize();
+            }
+            rawBlockCache.put(stored.getBlockNumber(), packed);
+            rawBlockBytes += packed.byteSize();
+        }
+        return packed;
+    }
+
+    private Block buildStoredBlock(V10StoredBlock stored, NormalizationType no, LongToDoubleFunction[] norms) {
+        RecordBlock packed = recordBlock(stored);
+        if (packed == null) return buildBlock(stored.getBlockNumber(), decodeBlock(stored), no, norms);
+        return buildPackedBlock(stored.getBlockNumber(), packed, no, norms);
+    }
+
+    private Block buildPackedBlock(int blockNumber, RecordBlock packed, NormalizationType no, LongToDoubleFunction[] norms) {
+        if (no == null || no.equals(NormalizationHandler.NONE)) {
+            return new Block(blockNumber, packed.records(v10Zoom.isScore()),
+                    BlockLoader.getBlockKey(getKey(), blockNumber, no));
+        }
+        String key = BlockLoader.getBlockKey(getKey(), blockNumber, no);
+        if (norms == null) return new Block(blockNumber, key);
+        List<ContactRecord> records = new ArrayList<>(packed.size);
+        for (int i = 0; i < packed.size; i++) {
+            double denominator = norms[0].applyAsDouble(packed.x[i]) * norms[1].applyAsDouble(packed.y[i]);
+            if (!Double.isFinite(denominator) || denominator == 0) continue;
+            float value = (float) (packed.value(i, v10Zoom.isScore()) / denominator);
+            if (!Float.isNaN(value)) records.add(new ContactRecord(packed.x[i], packed.y[i], value));
+        }
+        return new Block(blockNumber, records, key);
+    }
+
+    private static final class RecordBlock {
+        final int[] x, y;
+        final long[] values;
+        int size;
+        RecordBlock(int capacity) {
+            x = new int[capacity]; y = new int[capacity]; values = new long[capacity];
+        }
+        long byteSize() { return 16L * x.length; }
+        float value(int i, boolean scored) {
+            return scored ? Float.intBitsToFloat((int) values[i]) : values[i] >= 0 ? (float) values[i]
+                    : V10.unsignedLong(values[i]).floatValue();
+        }
+        List<ContactRecord> records(boolean scored) {
+            List<ContactRecord> records = new ArrayList<>(size);
+            for (int i = 0; i < size; i++) records.add(scored ? new ContactRecord(x[i], y[i], value(i, true))
+                    : V10ContactRecord.create(x[i], y[i], values[i]));
+            return records;
+        }
+        int rowStart(long row) {
+            int lo = 0, hi = size;
+            while (lo < hi) {
+                int mid = (lo + hi) >>> 1;
+                if (y[mid] < row) lo = mid + 1;
+                else hi = mid;
+            }
+            return lo;
+        }
+        void visit(long x1, long y1, long x2, long y2, boolean filter, boolean transpose,
+                   boolean scored, V10RecordHandler handler) {
+            int first = filter ? rowStart(y1) : 0, last = filter ? rowStart(y2 + 1) : size;
+            int secondFirst = filter && transpose ? rowStart(x1) : 0;
+            int secondLast = filter && transpose ? rowStart(x2 + 1) : 0;
+            if (secondFirst < first) {
+                int start = first, end = last;
+                first = secondFirst; last = secondLast; secondFirst = start; secondLast = end;
+            }
+            for (int pass = 0; pass < 2; pass++) {
+                int from = pass == 0 ? first : Math.max(last, secondFirst);
+                int to = pass == 0 ? last : secondLast;
+                for (int i = from; i < to; i++) {
+                    boolean inside = x[i] >= x1 && x[i] <= x2 && y[i] >= y1 && y[i] <= y2;
+                    if (filter && !inside && !(transpose && y[i] >= x1 && y[i] <= x2 && x[i] >= y1 && x[i] <= y2)) continue;
+                    handler.record(x[i], y[i], scored ? 0 : values[i], scored ? value(i, true) : 0f, scored);
+                }
+            }
+        }
     }
 
     // -------------------------------------------------------- normalization
@@ -429,6 +556,12 @@ public class V10MatrixZoomData extends MatrixZoomData {
     public void streamMaterializedRecords(long binX1, long binY1, long binX2, long binY2,
                                           final boolean filterToRegion, final V10RecordHandler handler)
             throws IOException {
+        streamMaterializedRecords(binX1, binY1, binX2, binY2, filterToRegion, false, handler);
+    }
+
+    private void streamMaterializedRecords(long binX1, long binY1, long binX2, long binY2,
+                                           boolean filterToRegion, boolean includeTransposed, V10RecordHandler handler)
+            throws IOException {
         V10.require(!isDerivedResolution(), "resolution is derived; query its source instead");
         List<V10Grid.BlockRange> ranges = V10Grid.blockRangesForRegion(binX1, binY1, binX2, binY2,
                 v10Zoom, nBins1, nBins2);
@@ -437,15 +570,34 @@ public class V10MatrixZoomData extends MatrixZoomData {
         final long y1 = binY1;
         final long y2 = binY2;
 
-        BlockScan scan = new BlockScan(v10Reader, entriesFor(ranges));
-        V10StoredBlock stored;
-        while ((stored = scan.next()) != null) {
+        List<V10BlockIndexEntry> selected = entriesFor(ranges);
+        List<V10BlockIndexEntry> missing = new ArrayList<>();
+        Map<Integer, RecordBlock> resident = new HashMap<>();
+        for (V10BlockIndexEntry entry : selected) {
+            RecordBlock packed = cachedRecordBlock(entry.blockNumber);
+            if (packed == null) missing.add(entry);
+            else resident.put(entry.blockNumber, packed);
+        }
+        BlockScan scan = new BlockScan(v10Reader, missing);
+        for (V10BlockIndexEntry entry : selected) {
+            RecordBlock packed = resident.get(entry.blockNumber);
+            V10StoredBlock stored = null;
+            if (packed == null) {
+                stored = scan.next();
+                V10.require(stored != null && stored.getBlockNumber() == entry.blockNumber, "missing source block");
+                packed = recordBlock(stored);
+            }
+            if (packed != null) {
+                packed.visit(x1, y1, x2, y2, filterToRegion, includeTransposed, v10Zoom.isScore(), handler);
+                continue;
+            }
             V10BlockDecoder.decode(stored.cursor(), stored.getBlockNumber(), v10Zoom, nBins1, nBins2,
                     isIntra, new V10RecordHandler() {
                         @Override
                         public void record(int binColumn, int binRow, long count, float score, boolean isScore) {
-                            if (filterToRegion && (binColumn < x1 || binColumn > x2
-                                    || binRow < y1 || binRow > y2)) {
+                            boolean inside = binColumn >= x1 && binColumn <= x2 && binRow >= y1 && binRow <= y2;
+                            if (filterToRegion && !inside && !(includeTransposed && binRow >= x1 && binRow <= x2
+                                    && binColumn >= y1 && binColumn <= y2)) {
                                 return;
                             }
                             handler.record(binColumn, binRow, count, score, isScore);
@@ -479,7 +631,7 @@ public class V10MatrixZoomData extends MatrixZoomData {
         long sourceY2 = Math.min((y2 + 1) * factor - 1, sourceZD.nBins2 - 1);
 
         final boolean cis = isIntra;
-        sourceZD.streamMaterializedRecords(sourceX1, sourceY1, sourceX2, sourceY2, false,
+        sourceZD.streamMaterializedRecords(sourceX1, sourceY1, sourceX2, sourceY2, true, includeTransposed && cis,
                 new V10RecordHandler() {
                     @Override
                     public void record(int binColumn, int binRow, long count, float score, boolean isScore) {
